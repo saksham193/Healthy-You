@@ -5,33 +5,54 @@ node_modules/
 
 # Expo
 .expo/
+.expo-validation/
 dist/
 web-build/
 expo-env.d.ts
+coverage/
 
 # Native
 .kotlin/
 *.orig.*
+*.keystore
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+android/app/build/
+ios/build/
 
 # Metro
 .metro-health-check*
 
 # debug
+npm-debug.log*
 npm-debug.*
+yarn-debug.log*
 yarn-debug.*
+yarn-error.log*
 yarn-error.*
+*.log
 
 # macOS
 .DS_Store
+Thumbs.db
 *.pem
 
 # local env files
+.env
+.env.local
+.env.development.local
+.env.production.local
 .env*.local
+backend/.env*
+!backend/.env.example
+backend/.env*.local
+backend/data/*.sqlite
+backend/data/*.sqlite-*
+*.secret
+*.secrets
 
 # typescript
 *.tsbuildinfo

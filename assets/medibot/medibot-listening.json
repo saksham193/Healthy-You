@@ -1,0 +1,13 @@
+{
+  "name": "medibot-listening",
+  "runtime": "react-native-animated",
+  "durationMs": 1800,
+  "loop": true,
+  "source": "medibot-static.png",
+  "motion": {
+    "leanDeg": 2,
+    "outerRingScale": [1, 1.14],
+    "outerRingOpacity": [0.24, 0.55],
+    "breathingScale": [0.99, 1.015]
+  }
+}

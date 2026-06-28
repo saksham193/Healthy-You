@@ -1,0 +1,13 @@
+{
+  "name": "medibot-idle",
+  "runtime": "react-native-animated",
+  "durationMs": 6800,
+  "loop": true,
+  "source": "medibot-static.png",
+  "motion": {
+    "translateY": [-4, 4],
+    "scale": [0.98, 1.02],
+    "glowOpacity": [0.22, 0.42],
+    "sparkleOpacity": [0.35, 0.9]
+  }
+}

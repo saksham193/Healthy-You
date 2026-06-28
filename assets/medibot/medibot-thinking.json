@@ -1,0 +1,12 @@
+{
+  "name": "medibot-thinking",
+  "runtime": "react-native-animated",
+  "durationMs": 2200,
+  "loop": true,
+  "source": "medibot-static.png",
+  "motion": {
+    "rotateDeg": [-3, 3],
+    "glowOpacity": [0.28, 0.72],
+    "particleOrbit": true
+  }
+}

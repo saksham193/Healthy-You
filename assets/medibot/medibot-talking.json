@@ -1,0 +1,13 @@
+{
+  "name": "medibot-talking",
+  "runtime": "react-native-animated",
+  "durationMs": 900,
+  "loop": true,
+  "source": "medibot-static.png",
+  "motion": {
+    "translateY": [-2, 2],
+    "scale": [0.99, 1.025],
+    "mouthPulse": [0.32, 0.74],
+    "sparkleOpacity": [0.5, 1]
+  }
+}
