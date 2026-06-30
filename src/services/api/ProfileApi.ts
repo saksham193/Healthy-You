@@ -3,6 +3,7 @@ import { apiClient } from "./ApiClient";
 
 type ProfileSyncResponse = {
   userId: string;
+  profile?: PersonalHealthProfile;
   profileJson: string;
   updatedAt: string;
 };

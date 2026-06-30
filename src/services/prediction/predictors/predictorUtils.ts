@@ -11,6 +11,9 @@ import type {
 } from "../PredictionTypes";
 
 export const dataQualityForContext = (context: AIContext): PredictionDataQuality => {
+  if (context.trendIntelligence?.dataQuality === "insufficient") return "limited";
+  if (context.trendIntelligence?.dataQuality === "stale") return "stale";
+  if (context.trendIntelligence?.dataQuality === "limited") return "limited";
   if (context.deviceDataSource === "unavailable") return "unavailable";
   if (context.deviceDataSource === "no_data") return "unavailable";
   if (context.deviceDataSource === "fallback" || context.deviceDataSource === "demo") return "limited";

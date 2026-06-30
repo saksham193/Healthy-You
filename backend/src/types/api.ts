@@ -35,11 +35,39 @@ export type MemoryRecord = {
   confidence: number;
   createdAt: string;
   updatedAt: string;
+  content?: string;
+  summary?: string;
+  type?: string;
+  source?: string;
+  importance?: number;
+  metadata?: Record<string, unknown>;
+  embedding?: number[] | null;
 };
 
 export type HealthProfileRecord = {
   userId: string;
   profileJson: string;
+  updatedAt: string;
+};
+
+export type HealthProfileSyncResponse = {
+  userId: string;
+  profile: Record<string, unknown>;
+  profileJson: string;
+  updatedAt: string;
+};
+
+export type HealthSummaryRecord = {
+  id: string;
+  userId: string;
+  date: string;
+  source: string;
+  deviceSource: string;
+  displaySource: string;
+  summaryType: string;
+  metrics: Record<string, number>;
+  scores: Record<string, number>;
+  syncMetadata: Record<string, unknown>;
   updatedAt: string;
 };
 

@@ -44,6 +44,59 @@ export class LocalRecommendationEngine {
       : 0;
     const vegetarian = input.profile.dietaryPreferences.some((item) => /vegetarian|vegan/i.test(item)) ||
       hasMemory(input.memory, "dietary_preference", /vegetarian|vegan/i);
+    const learnedPreferences = input.context.intelligenceProfile?.learnedPreferences ?? [];
+    const preferredWorkoutTime = learnedPreferences.find(
+      (preference) => preference.key === "preferred_workout_time" && preference.confidence >= 0.7,
+    );
+    const favoriteActivity = learnedPreferences.find(
+      (preference) => preference.key === "favorite_activity" && preference.confidence >= 0.7,
+    );
+    const trendSignal = input.context.trendIntelligence?.topTrends[0];
+    const coachingSignal = input.context.goalHabitCoaching?.recommendations[0];
+    const topInsight = input.context.aiInsights?.topInsights[0];
+    const briefing = input.context.dailyBriefing;
+
+    if (briefing && briefing.safetyLevel !== "urgent" && briefing.recommendedActions[0]) {
+      items.push(recommendation(
+        "offline-daily-briefing-focus",
+        "daily_briefing",
+        briefing.recommendedActions[0],
+        `Daily briefing focus: ${briefing.focusArea ?? "general wellness"}. ${briefing.dataSourceNote}`,
+        briefing.safetyLevel === "caution" ? "high" : briefing.confidence === "low" ? "medium" : "high",
+      ));
+    }
+
+    if (topInsight && topInsight.safetyLevel !== "urgent") {
+      items.push(recommendation(
+        `offline-insight-${topInsight.category}`,
+        topInsight.category === "activity" || topInsight.category === "recovery"
+          ? "fitness"
+          : topInsight.category === "device_data"
+            ? "device_status"
+            : topInsight.category === "general_wellness"
+              ? "general_health"
+              : topInsight.category,
+        topInsight.suggestedAction,
+        `Top ranked insight: ${topInsight.title}. ${topInsight.explanation}`,
+        topInsight.priority,
+      ));
+    }
+
+    if (coachingSignal) {
+      items.push(recommendation(
+        `offline-coaching-${coachingSignal.domain}`,
+        coachingSignal.domain === "activity" || coachingSignal.domain === "recovery"
+          ? "fitness"
+          : coachingSignal.domain === "medication_adherence"
+            ? "medication"
+            : coachingSignal.domain === "general_wellness"
+              ? "general_health"
+              : coachingSignal.domain,
+        coachingSignal.message,
+        `${coachingSignal.reason} Coaching confidence is ${coachingSignal.confidence}.`,
+        coachingSignal.priority,
+      ));
+    }
 
     if ((input.intent === "hydration" || input.intent === "general_health") && hydrationPercent < 0.85) {
       items.push(recommendation(
@@ -52,6 +105,26 @@ export class LocalRecommendationEngine {
         "Drink one normal glass of water now if you are not on a fluid restriction, then log it.",
         `Hydration is ${input.context.hydrationGlasses}/${input.context.hydrationGoal || "unknown"} glasses.`,
         hydrationPercent < 0.6 ? "high" : "medium",
+      ));
+    }
+
+    if (
+      (input.intent === "trend_summary" || input.intent === "general_health") &&
+      trendSignal &&
+      trendSignal.direction !== "insufficient_data"
+    ) {
+      items.push(recommendation(
+        "offline-trend-focus",
+        input.intent === "trend_summary" ? "trend_summary" : "general_health",
+        trendSignal.metric === "sleep_minutes"
+          ? "Make sleep recovery the trend focus today."
+          : trendSignal.metric === "hydration_ml"
+            ? "Make hydration consistency the trend focus today."
+            : trendSignal.metric === "steps" || trendSignal.metric === "activity_minutes"
+              ? "Make gentle movement the trend focus today."
+              : "Use the top trend as today's wellness focus.",
+        `${trendSignal.label} is ${trendSignal.direction} with ${trendSignal.confidence} confidence. ${trendSignal.interpretation}`,
+        trendSignal.habitDrift || trendSignal.abnormalChange ? "high" : "medium",
       ));
     }
 
@@ -69,8 +142,14 @@ export class LocalRecommendationEngine {
       items.push(recommendation(
         "offline-light-activity",
         "fitness",
-        "Add a short easy walk or mobility break if you feel well.",
-        `Steps are ${input.context.steps}/${input.context.stepGoal}.`,
+        favoriteActivity
+          ? `Add a short ${favoriteActivity.value} session if you feel well.`
+          : "Add a short easy walk or mobility break if you feel well.",
+        [
+          `Steps are ${input.context.steps}/${input.context.stepGoal}.`,
+          preferredWorkoutTime ? `Learned workout time: ${preferredWorkoutTime.value}.` : "",
+          favoriteActivity ? `Favorite activity confidence: ${Math.round(favoriteActivity.confidence * 100)}%.` : "",
+        ].filter(Boolean).join(" "),
         input.context.steps < input.context.stepGoal * 0.5 ? "high" : "medium",
       ));
     }
@@ -146,8 +225,20 @@ export class LocalRecommendationEngine {
       ));
     }
 
-    return items.slice(0, 5);
+    return dedupeRecommendations(items).slice(0, 5);
   }
 }
 
 export const localRecommendationEngine = new LocalRecommendationEngine();
+
+const dedupeRecommendations = (items: OfflineRecommendation[]): OfflineRecommendation[] => {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const key = item.message.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+
+    return true;
+  });
+};

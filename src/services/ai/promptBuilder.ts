@@ -33,6 +33,60 @@ const compactTrends = (context: AIContext): string =>
     .map((trend) => `${trend.metric} ${trend.direction} (${trend.percentageChange}%, latest ${trend.latestValue})`)
     .join("; ") || "No trend signals";
 
+const compactTrendIntelligence = (context: AIContext): string => {
+  const summary = context.trendIntelligence;
+  if (!summary) return "No trend intelligence available";
+
+  const trends = summary.compactSummary.slice(0, 4).join("; ") || "No compact trend signals";
+  const drifts = summary.habitDrifts
+    .slice(0, 3)
+    .map((drift) => `${drift.message} (${drift.confidence} confidence)`)
+    .join("; ") || "No habit drift detected";
+
+  return [
+    `Weekly Trend Summary: ${summary.weeklySummary}`,
+    `Top Trends: ${trends}`,
+    `Habit Drift: ${drifts}`,
+    `Overall Trend Confidence: ${summary.confidence}; Data Quality: ${summary.dataQuality}`,
+  ].join("\n");
+};
+
+const compactGoalHabitCoaching = (context: AIContext): string => {
+  const coaching = context.goalHabitCoaching;
+  if (!coaching) return "No coaching summary available";
+
+  const topLines = coaching.compactSummary.slice(0, 4).join("\n") || "No active coaching items";
+  const confidence = `Coaching Confidence: ${coaching.confidence}; Data Quality: ${coaching.dataQuality}`;
+
+  return [topLines, confidence].join("\n");
+};
+
+const compactAIHealthInsights = (context: AIContext): string => {
+  const insights = context.aiInsights;
+  if (!insights?.topInsights.length) return "No ranked AI insights available";
+
+  const top = insights.topInsights.slice(0, 3).map((insight) =>
+    `- ${insight.title}: ${insight.supportingSignals.slice(0, 2).join(" + ")}. Action: ${insight.suggestedAction} Confidence: ${insight.confidence}.`,
+  );
+
+  return [
+    ...top,
+    `Insight Summary Confidence: ${insights.confidence}; Data Quality: ${insights.dataQuality}`,
+  ].join("\n");
+};
+
+const compactDailyBriefing = (context: AIContext): string => {
+  const briefing = context.dailyBriefing;
+  if (!briefing) return "No daily briefing available";
+
+  return [
+    `Focus: ${briefing.focusArea ?? "general wellness"}`,
+    `Top Insight: ${briefing.topInsight ?? "None available"}`,
+    `Actions: ${briefing.recommendedActions.slice(0, 3).join("; ") || "None available"}`,
+    `Confidence: ${briefing.confidence}; Safety: ${briefing.safetyLevel}; Source: ${briefing.dataSourceNote}`,
+  ].join("\n");
+};
+
 const compactInsights = (context: AIContext): string =>
   context.insights
     .slice(0, 4)
@@ -42,7 +96,7 @@ const compactInsights = (context: AIContext): string =>
 const compactRecommendations = (context: AIContext): string =>
   context.personalizedRecommendations
     .slice(0, 4)
-    .map((recommendation) => `${recommendation.priority}: ${recommendation.message}`)
+    .map((recommendation) => `${recommendation.priority}: ${recommendation.message} Why: ${recommendation.reason}`)
     .join("; ") || "No personalized recommendations";
 
 const compactPredictions = (context: AIContext): string =>
@@ -52,6 +106,64 @@ const compactPredictions = (context: AIContext): string =>
       `${prediction.category}: ${prediction.riskLevel} risk, ${prediction.confidence} confidence, ${prediction.horizon}; ${prediction.explanation.summary}`,
     )
     .join("; ") || "No predictive wellness signals";
+
+const compactRecommendationDecision = (context: AIContext): string => {
+  const decision = context.recommendationDecision;
+  if (!decision) return "No recommendation decision available";
+
+  return [
+    `Primary: ${decision.primary.action}`,
+    `Category: ${decision.primary.category}; Source: ${decision.primary.source}; Priority: ${decision.primary.priority}`,
+    `Why: ${decision.rankingReason}`,
+    `Confidence: ${decision.confidence}`,
+  ].join("\n");
+};
+
+const compactPreventiveSummary = (context: AIContext): string => {
+  const summary = context.preventiveSummary;
+  if (!summary) {
+    return [
+      "Overall risk: unavailable",
+      "Primary risk: none",
+      "Focus: general wellness",
+      "Confidence: low",
+    ].join("\n");
+  }
+
+  return [
+    `Overall risk: ${summary.overallRisk}`,
+    `Primary risk: ${summary.primaryRisk?.title ?? "none"}`,
+    `Focus: ${summary.focus}`,
+    `Confidence: ${summary.confidence}`,
+  ].join("\n");
+};
+
+const compactIntelligenceProfile = (context: AIContext): string => {
+  const profile = context.intelligenceProfile;
+  if (!profile) {
+    return "AI Personalization Score: unavailable\nCoaching Style: friendly\nResponse Length: concise\nLearned Preferences: None learned yet";
+  }
+
+  const learned = profile.learnedPreferences
+    .slice(0, 5)
+    .map((preference) => `${preference.label} (${Math.round(preference.confidence * 100)}%)`)
+    .join("; ") || "None learned yet";
+
+  return [
+    `AI Personalization Score: ${profile.personalizationScore}%`,
+    `Coaching Style: ${profile.preferredCoachingStyle}`,
+    `Response Length: ${profile.preferredResponseLength}`,
+    `Fitness Level: ${profile.fitnessLevel}`,
+    `Activity Pattern: ${profile.activityPattern}`,
+    `Sleep Pattern: ${profile.sleepPattern}`,
+    `Hydration Pattern: ${profile.hydrationPattern}`,
+    `Nutrition Pattern: ${profile.nutritionPattern}`,
+    `Stress Pattern: ${profile.stressPattern}`,
+    `Behavior Confidence: ${profile.behaviorConfidence}%`,
+    `Learning Confidence: ${profile.learningConfidence}%`,
+    `Learned Preferences: ${learned}`,
+  ].join("\n");
+};
 
 const compactRelevantDeviceData = (message: string, context: AIContext): string => {
   const normalized = message.toLowerCase();
@@ -114,12 +226,31 @@ const basePrompt = (label: string, message: string, context: AIContext): string 
     "",
     "Personal Context:",
     compactProfile(context),
+    compactIntelligenceProfile(context),
     `Memory: ${compactMemory(context)}`,
     `Trends: ${compactTrends(context)}`,
+    "Trend Intelligence:",
+    compactTrendIntelligence(context),
+    "Coaching Summary:",
+    compactGoalHabitCoaching(context),
+    "Top AI Insights:",
+    compactAIHealthInsights(context),
+    "Daily Briefing:",
+    compactDailyBriefing(context),
+    "Recommendation Decision:",
+    compactRecommendationDecision(context),
     `Recent Insights: ${compactInsights(context)}`,
     `Personalized Recommendations: ${compactRecommendations(context)}`,
+    "Preventive Wellness:",
+    compactPreventiveSummary(context),
     `Predictive Wellness Signals: ${compactPredictions(context)}`,
     "Prediction Safety: Treat predictions as wellness trend signals, not diagnosis, certainty, or treatment instructions.",
+    "Coaching Safety: Keep goals gradual, wellness-only, and never suggest medication dose changes or unsafe exercise escalation.",
+    "Insight Safety: Treat insights as wellness signals. Include explanation and next action, but do not diagnose, predict disease, or claim certainty.",
+    "Briefing Safety: For briefing questions, answer from the Daily Briefing section first, include the data note, cap recommended actions to three, and keep the answer concise, wellness-only, and action-oriented.",
+    "Recommendation Safety: For recommendation questions, use the Recommendation Decision section first. Do not surface suppressed or unsafe actions.",
+    "Preventive Safety: Treat preventive wellness as behavioral pattern awareness only. Do not diagnose disease, mental health conditions, dehydration, burnout, or chronic fatigue.",
+    "Personalization Safety: Adapt tone and length to the intelligence profile, but do not overstate learned preferences. Include a brief reason when making a recommendation.",
     "",
     `Question: ${message}`,
   ].join("\n");

@@ -69,6 +69,8 @@ export function mergeProfileData(
       ...(baseProfile.chronicConditions ?? []),
       ...(updates.chronicConditions ?? []),
     ]),
+    medications: updates.medications ?? baseProfile.medications,
+    preferences: updates.preferences ?? baseProfile.preferences,
     activityLevel: updates.activityLevel ?? baseProfile.activityLevel,
     averageSleepHours: updates.averageSleepHours ?? baseProfile.averageSleepHours,
     medicationAdherence: updates.medicationAdherence ?? baseProfile.medicationAdherence,

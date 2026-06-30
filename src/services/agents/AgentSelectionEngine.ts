@@ -39,6 +39,16 @@ const selectExecutionMode = (agents: HealthAgentId[], riskLevel: AgentRiskLevel)
 export class AgentSelectionEngine {
   select(message: string, intent: AIIntent): AgentDecision {
     const normalized = message.trim();
+    if (intent === "daily_briefing") {
+      return {
+        selectedAgents: [],
+        executionMode: "single",
+        primaryIntent: intent,
+        reason: "Daily briefing request uses the precomputed briefing context without specialist fan-out.",
+        riskLevel: "routine",
+      };
+    }
+
     const matchedAgents = Object.entries(domainPatterns)
       .filter(([, patterns]) => patterns.some((pattern) => pattern.test(normalized)))
       .map(([agentId]) => agentId as HealthAgentId);

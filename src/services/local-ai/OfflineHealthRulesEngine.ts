@@ -71,6 +71,52 @@ export class OfflineHealthRulesEngine {
     const waterTrendRisk = hasTrendRisk(trends, "water");
     const stepsTrendRisk = hasTrendRisk(trends, "steps");
     const adherenceTrendRisk = hasTrendRisk(trends, "medicationAdherence");
+    const topTrend = context.trendIntelligence?.topTrends[0];
+    const topDrift = context.trendIntelligence?.habitDrifts[0];
+    const briefing = context.dailyBriefing;
+
+    if (input.intent === "daily_briefing" && briefing) {
+      rules.push(makeRule(
+        "daily-briefing-summary",
+        "daily_briefing",
+        `${briefing.greeting} ${briefing.summary}`,
+        [
+          `briefing focus: ${briefing.focusArea ?? "general wellness"}`,
+          `briefing confidence: ${briefing.confidence}`,
+          briefing.dataSourceNote,
+        ],
+        [
+          ...briefing.recommendedActions.slice(0, 3),
+          "Use this as wellness guidance only, not a diagnosis or medical certainty.",
+        ],
+        briefing.safetyLevel === "urgent" ? "urgent" : briefing.confidence === "low" ? "limited" : "routine",
+      ));
+    }
+
+    if (input.intent === "trend_summary" && topTrend) {
+      rules.push(makeRule(
+        "trend-intelligence-summary",
+        "trend_summary",
+        `${topTrend.label} is ${topTrend.direction.replace(/_/g, " ")} with ${topTrend.confidence} confidence. ${topTrend.reason}`,
+        topDrift ? [topDrift.message] : ["trend summary"],
+        [
+          topTrend.interpretation,
+          "Use this as wellness guidance only, not a diagnosis or medical certainty.",
+        ],
+        topTrend.dataQuality === "stale" || topTrend.dataQuality === "limited" ? "limited" : "routine",
+      ));
+    }
+
+    if (input.intent === "trend_summary" && !topTrend) {
+      rules.push(makeRule(
+        "trend-intelligence-insufficient",
+        "trend_summary",
+        "I do not have enough recent local summary history for a strong trend yet.",
+        ["insufficient trend data"],
+        ["Keep syncing or logging for a few more days.", "Ask for today's current metrics if you need a snapshot."],
+        "limited",
+      ));
+    }
 
     if (hydrationPercent > 0 && hydrationPercent < 0.7) {
       rules.push(makeRule(

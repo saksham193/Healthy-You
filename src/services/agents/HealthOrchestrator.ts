@@ -74,25 +74,30 @@ export class HealthOrchestrator {
       };
     }
 
-    const { decision, results } = await this.runAgents(request, response);
+    const { decision: agentDecision, results } = await this.runAgents(request, response);
     const coordinated = healthCoordinator.coordinate(results);
     const agentSuggestions = coordinated.topActions.map((item) => item.message);
     const predictionSuggestions = request.context.predictions.topPredictions.flatMap((prediction) =>
       prediction.preventiveActions.slice(0, 1).map((action) => action.message),
     );
+    const recommendationDecision = request.context.recommendationDecision;
+    const preventive = request.context.preventiveSummary;
+    const decisionSuggestions = recommendationDecision
+      ? [recommendationDecision.primary.action, ...recommendationDecision.alternatives.map((item) => item.action)]
+      : [];
 
     return {
       ...response,
-      suggestions: uniqueSuggestions([...predictionSuggestions, ...agentSuggestions, ...response.suggestions]),
+      suggestions: uniqueSuggestions([...decisionSuggestions, ...predictionSuggestions, ...agentSuggestions, ...response.suggestions]),
       metadata: {
         ...response.metadata,
         citations: response.metadata?.citations ?? coordinated.citations,
         orchestratorVersion: ORCHESTRATOR_VERSION,
-        coordinationMode: decision.executionMode,
+        coordinationMode: agentDecision.executionMode,
         agentsUsed: coordinated.agentsUsed,
         agentConfidence: coordinated.confidence,
         agentLatency: coordinated.agentLatency,
-        agentRoutingReason: decision.reason,
+        agentRoutingReason: agentDecision.reason,
         agentRiskLevel: coordinated.riskLevel,
         agentConflictCount: coordinated.conflictCount,
         agentConsensusPercent: coordinated.consensusPercent,
@@ -108,6 +113,19 @@ export class HealthOrchestrator {
         predictionCategories: request.context.predictions.metrics.predictionCategories,
         averagePredictionConfidence: request.context.predictions.metrics.averageConfidence,
         dataQualityIssues: request.context.predictions.metrics.dataQualityIssues,
+        recommendationDecisionId: recommendationDecision?.id,
+        recommendationPrimaryAction: recommendationDecision?.primary.action,
+        recommendationPrimaryCategory: recommendationDecision?.primary.category,
+        recommendationPrimarySource: recommendationDecision?.primary.source,
+        recommendationDecisionConfidence: recommendationDecision?.confidence,
+        recommendationAlternativeCount: recommendationDecision?.alternatives.length,
+        recommendationSuppressedCount: recommendationDecision?.suppressed.length,
+        recommendationRankingReason: recommendationDecision?.rankingReason,
+        preventiveOverallRisk: preventive?.overallRisk,
+        preventivePrimaryRisk: preventive?.primaryRisk?.title,
+        preventiveFocus: preventive?.focus,
+        preventiveConfidence: preventive?.confidence,
+        preventiveRiskCount: preventive?.risks.length,
       },
     };
   }

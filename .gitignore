@@ -27,6 +27,7 @@ ios/build/
 .metro-health-check*
 
 # debug
+logs/
 npm-debug.log*
 npm-debug.*
 yarn-debug.log*
@@ -42,15 +43,16 @@ Thumbs.db
 
 # local env files
 .env
-.env.local
-.env.development.local
-.env.production.local
-.env*.local
+.env.*
+!.env.example
+backend/dist/
+backend/data/
 backend/.env*
 !backend/.env.example
-backend/.env*.local
-backend/data/*.sqlite
-backend/data/*.sqlite-*
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
 *.secret
 *.secrets
 

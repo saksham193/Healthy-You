@@ -8,13 +8,24 @@ import type {
   SafetyClassification,
 } from "./MedicalKnowledgeTypes";
 
-const intentCategoryMap: Record<BackendAIRequest["intent"], MedicalKnowledgeCategory[]> = {
+const intentCategoryMap: Partial<Record<BackendAIRequest["intent"], MedicalKnowledgeCategory[]>> = {
   nutrition: ["nutrition"],
   fitness: ["exercise", "device_health_data"],
   sleep: ["sleep"],
   medication: ["medication_adherence"],
   hydration: ["hydration"],
   general: ["general_wellness", "preventive_health"],
+  steps_query: ["exercise", "device_health_data"],
+  heart_rate_query: ["exercise", "device_health_data", "preventive_health"],
+  sleep_query: ["sleep", "device_health_data"],
+  calories_query: ["exercise", "nutrition"],
+  hydration_query: ["hydration"],
+  activity_query: ["exercise", "device_health_data"],
+  device_sync_query: ["device_health_data"],
+  health_score_query: ["general_wellness", "preventive_health"],
+  daily_briefing: ["general_wellness", "preventive_health", "device_health_data"],
+  general_wellness: ["general_wellness", "preventive_health"],
+  medical_safety: ["preventive_health", "general_wellness"],
 };
 
 const categoryRules: Array<{ category: MedicalKnowledgeCategory; patterns: RegExp[] }> = [
@@ -78,7 +89,7 @@ export class MedicalKnowledgeRetriever {
     const categories: MedicalKnowledgeCategory[] = unique<MedicalKnowledgeCategory>([
       ...safetyCategories,
       ...matchedCategories,
-      ...intentCategoryMap[request.intent],
+      ...(intentCategoryMap[request.intent] ?? ["general_wellness", "preventive_health"]),
       "general_wellness",
     ]).slice(0, 5);
     const tags = query

@@ -1,4 +1,4 @@
-import type { AIRequest, ProviderResponse } from "../../../types";
+import type { AIRequest, ProviderResponse, RecommendationCandidate, RecommendationCategory, RecommendationDecision } from "../../../types";
 import { cachedAIResponseStore } from "../../local-ai/CachedAIResponseStore";
 import { localRecommendationEngine } from "../../local-ai/LocalRecommendationEngine";
 import { offlineHealthRulesEngine } from "../../local-ai/OfflineHealthRulesEngine";
@@ -8,6 +8,7 @@ import type { OfflineAIResponse, OfflineIntent, OfflineRule } from "../../local-
 import { offlineAnalytics } from "../../observability/OfflineAnalytics";
 import { agentSelectionEngine } from "../../agents/AgentSelectionEngine";
 import { ORCHESTRATOR_VERSION } from "../../agents/HealthOrchestrator";
+import { normalizeRecommendationText, recommendationDecisionOrchestrator } from "../recommendation/RecommendationDecisionOrchestrator";
 import type { AIProvider } from "./AIProvider";
 
 const safetyRank: Record<OfflineAIResponse["safetyLevel"], number> = {
@@ -65,6 +66,71 @@ const offlinePrefix =
 
 const unique = (items: string[]): string[] => Array.from(new Set(items.filter(Boolean)));
 
+const compactBriefingLine = (request: AIRequest): string | undefined => {
+  const briefing = request.context.dailyBriefing;
+  if (!briefing) return undefined;
+
+  const actions = briefing.recommendedActions.slice(0, 3).join(" ");
+
+  return [
+    `Daily briefing: ${briefing.greeting} ${briefing.summary}`,
+    actions ? `Briefing actions: ${actions}` : "",
+    `Briefing metadata: focus ${briefing.focusArea ?? "general wellness"}, ${briefing.confidence} confidence, ${briefing.safetyLevel} safety. ${briefing.dataSourceNote}`,
+  ].filter(Boolean).join("\n");
+};
+
+const categoryForOfflineIntent = (intent: OfflineIntent, message: string): RecommendationCategory => {
+  if (intent === "hydration" || /\bwater|hydration|hydrate\b/i.test(message)) return "hydration";
+  if (intent === "sleep" || /\bsleep|bedtime|rest\b/i.test(message)) return "sleep";
+  if (intent === "fitness" || /\bactivity|steps|walk|movement|fitness|workout\b/i.test(message)) return "activity";
+  if (intent === "nutrition" || /\bfood|meal|nutrition|protein|calorie\b/i.test(message)) return "nutrition";
+  if (intent === "medication" || /\bmedication|medicine|pill|dose\b/i.test(message)) return "medication";
+  if (intent === "device_status" || /\bdevice|sync|health connect\b/i.test(message)) return "device_data";
+
+  return "general_wellness";
+};
+
+const offlineRecommendationCandidates = (
+  recommendations: OfflineAIResponse["recommendations"],
+  now: Date,
+): RecommendationCandidate[] =>
+  recommendations.map((recommendation) => {
+    const category = categoryForOfflineIntent(recommendation.intent, `${recommendation.message} ${recommendation.reason}`);
+
+    return {
+      id: `decision-offline-${recommendation.id}`,
+      title: recommendation.message.length <= 56 ? recommendation.message : `${category.replace(/_/g, " ")} offline recommendation`,
+      summary: recommendation.reason,
+      category,
+      source: "fallback",
+      supportingSources: ["fallback"],
+      priority: recommendation.priority,
+      confidence: "medium",
+      action: recommendation.message,
+      reason: `Offline local recommendation: ${recommendation.reason}`,
+      safetyLevel: recommendation.intent === "medication" ? "caution" : "normal",
+      dedupeKey: `${category}:${normalizeRecommendationText(recommendation.message)}`,
+      createdAt: now.toISOString(),
+    };
+  });
+
+const compactDecisionLine = (decision: RecommendationDecision): string =>
+  [
+    `Recommendation decision: ${decision.primary.action}`,
+    `Decision why: ${decision.rankingReason}`,
+    `Decision confidence: ${decision.confidence}. Alternatives: ${decision.alternatives.length}; suppressed: ${decision.suppressed.length}.`,
+  ].join("\n");
+
+const compactPreventiveLine = (request: AIRequest): string | undefined => {
+  const summary = request.context.preventiveSummary;
+  if (!summary) return undefined;
+
+  return [
+    `Preventive wellness: overall ${summary.overallRisk} risk, focus ${summary.focus}, confidence ${summary.confidence}.`,
+    summary.primaryRisk ? `Primary preventive risk: ${summary.primaryRisk.title}. ${summary.primaryRisk.summary}` : "",
+  ].filter(Boolean).join("\n");
+};
+
 const buildEmergencyResponse = (rules: OfflineRule[]): OfflineAIResponse => ({
   response: [
     offlinePrefix,
@@ -112,6 +178,10 @@ export class OfflineAIProvider implements AIProvider {
       trends: request.context.trends,
       rules,
     });
+    const localDecision = recommendationDecisionOrchestrator.generate({
+      context: request.context,
+      extraCandidates: offlineRecommendationCandidates(recommendations, new Date()),
+    });
     const knowledge = offlineKnowledgeCache.search(request.message, offlineIntent);
     const cached = await cachedAIResponseStore.search(offlineIntent, request.message, 1);
     const safetyLevel = toSafetyLevel(rules);
@@ -120,6 +190,28 @@ export class OfflineAIProvider implements AIProvider {
       : undefined;
     const ruleLines = rules.slice(0, 3).map((rule) => rule.message);
     const recommendationLines = recommendations.slice(0, 3).map((item) => `Next step: ${item.message}`);
+    const explanationLines = recommendations.slice(0, 2).map((item) => `Why this fits you: ${item.reason}`);
+    const intelligenceProfile = request.context.intelligenceProfile;
+    const coachingStyle = intelligenceProfile?.preferredCoachingStyle ?? "friendly";
+    const personalizationScore = intelligenceProfile?.personalizationScore ?? request.context.profile.profileCompletenessScore ?? 0;
+    const preferredResponseLength = intelligenceProfile?.preferredResponseLength ?? "concise";
+    const learnedPreferenceCount = intelligenceProfile?.learnedPreferences.length ?? 0;
+    const styleLine = `Coaching style: ${coachingStyle}; personalization score ${personalizationScore}%.`;
+    const trendLine = request.context.trendIntelligence?.compactSummary.length
+      ? `Trend summary: ${request.context.trendIntelligence.compactSummary.slice(0, 3).join(" ")}`
+      : undefined;
+    const driftLine = request.context.trendIntelligence?.habitDrifts.length
+      ? `Habit drift: ${request.context.trendIntelligence.habitDrifts.slice(0, 2).map((drift) => drift.message).join(" ")}`
+      : undefined;
+    const coachingLine = request.context.goalHabitCoaching?.compactSummary.length
+      ? `Coaching summary: ${request.context.goalHabitCoaching.compactSummary.slice(0, 3).join(" ")}`
+      : undefined;
+    const insightLine = request.context.aiInsights?.compactSummary.length
+      ? `Top insights: ${request.context.aiInsights.compactSummary.slice(0, 3).join(" ")}`
+      : undefined;
+    const briefingLine = compactBriefingLine(request);
+    const decisionLine = compactDecisionLine(localDecision);
+    const preventiveLine = compactPreventiveLine(request);
     const knowledgeLine = knowledge[0] ? `General note: ${knowledge[0].summary}` : undefined;
     const limitationLine = offlineIntent === "unknown"
       ? "I could not confidently classify this offline. Reconnect for full cloud AI, or ask about hydration, sleep, nutrition, fitness, medication, device sync, or trends."
@@ -127,8 +219,17 @@ export class OfflineAIProvider implements AIProvider {
     const response = [
       offlinePrefix,
       cachedLine,
+      styleLine,
+      trendLine,
+      driftLine,
+      preventiveLine,
+      decisionLine,
+      briefingLine,
+      coachingLine,
+      insightLine,
       ...ruleLines,
       ...recommendationLines,
+      ...explanationLines,
       knowledgeLine,
       limitationLine,
       rules.find((rule) => rule.safetyLevel === safetyLevel)?.disclaimer,
@@ -136,6 +237,8 @@ export class OfflineAIProvider implements AIProvider {
     const offlineResponse: OfflineAIResponse = {
       response,
       suggestions: unique([
+        localDecision.primary.action,
+        ...localDecision.alternatives.map((item) => item.action),
         ...recommendations.map((item) => item.message),
         "Reconnect for cloud AI when available.",
         offlineIntent === "device_status" ? "Refresh device permissions and sync." : "",
@@ -150,15 +253,24 @@ export class OfflineAIProvider implements AIProvider {
     };
     offlineAnalytics.trackOfflineUse({ cacheHit: offlineResponse.cachedResponseUsed });
 
-    return this.toProviderResponse(request, offlineResponse);
+    return this.toProviderResponse(request, offlineResponse, localDecision);
   }
 
   async generateRecommendation(request: AIRequest): Promise<ProviderResponse> {
     return this.generateHealthResponse(request);
   }
 
-  private toProviderResponse(request: AIRequest, offlineResponse: OfflineAIResponse): ProviderResponse {
+  private toProviderResponse(request: AIRequest, offlineResponse: OfflineAIResponse, localDecision = request.context.recommendationDecision): ProviderResponse {
     const decision = agentSelectionEngine.select(request.message, request.intent);
+    const intelligenceProfile = request.context.intelligenceProfile;
+    const coachingStyle = intelligenceProfile?.preferredCoachingStyle ?? "friendly";
+    const personalizationScore = intelligenceProfile?.personalizationScore ?? request.context.profile.profileCompletenessScore ?? 0;
+    const preferredResponseLength = intelligenceProfile?.preferredResponseLength ?? "concise";
+    const learnedPreferenceCount = intelligenceProfile?.learnedPreferences.length ?? 0;
+    const coaching = request.context.goalHabitCoaching;
+    const topInsight = request.context.aiInsights?.topInsights[0];
+    const briefing = request.context.dailyBriefing;
+    const preventive = request.context.preventiveSummary;
 
     return {
       id: `offline-${Date.now()}`,
@@ -184,6 +296,38 @@ export class OfflineAIProvider implements AIProvider {
         predictionCategories: request.context.predictions.metrics.predictionCategories,
         averagePredictionConfidence: request.context.predictions.metrics.averageConfidence,
         dataQualityIssues: request.context.predictions.metrics.dataQualityIssues,
+        personalizationScore,
+        coachingStyle,
+        preferredResponseLength,
+        learnedPreferenceCount,
+        trendConfidence: request.context.trendIntelligence?.confidence,
+        trendDataQuality: request.context.trendIntelligence?.dataQuality,
+        trendSignalCount: request.context.trendIntelligence?.topTrends.length,
+        coachingProgressScore: coaching?.progressScore,
+        activeGoalCount: coaching?.goals.filter((goal) => goal.status === "active" || goal.status === "at_risk").length,
+        atRiskHabitCount: coaching?.atRiskCount,
+        topInsightCategory: topInsight?.category,
+        topInsightPriority: topInsight?.priority,
+        topInsightConfidence: topInsight?.confidence,
+        insightCount: request.context.aiInsights?.allInsights.length,
+        briefingGeneratedAt: briefing?.generatedAt,
+        briefingRecommendedActionCount: briefing?.recommendedActions.length,
+        briefingFocusArea: briefing?.focusArea,
+        briefingConfidence: briefing?.confidence,
+        briefingSafetyLevel: briefing?.safetyLevel,
+        recommendationDecisionId: localDecision?.id,
+        recommendationPrimaryAction: localDecision?.primary.action,
+        recommendationPrimaryCategory: localDecision?.primary.category,
+        recommendationPrimarySource: localDecision?.primary.source,
+        recommendationDecisionConfidence: localDecision?.confidence,
+        recommendationAlternativeCount: localDecision?.alternatives.length,
+        recommendationSuppressedCount: localDecision?.suppressed.length,
+        recommendationRankingReason: localDecision?.rankingReason,
+        preventiveOverallRisk: preventive?.overallRisk,
+        preventivePrimaryRisk: preventive?.primaryRisk?.title,
+        preventiveFocus: preventive?.focus,
+        preventiveConfidence: preventive?.confidence,
+        preventiveRiskCount: preventive?.risks.length,
       },
     };
   }

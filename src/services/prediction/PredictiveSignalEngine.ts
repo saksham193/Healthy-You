@@ -39,6 +39,7 @@ const hoursSince = (iso: string | null): number | undefined => {
 export class PredictiveSignalEngine {
   extract(context: AIContext): PredictiveSignal[] {
     const signals: PredictiveSignal[] = [];
+    const trendIntelligence = context.trendIntelligence;
     const sleepTrend = trendFor(context, "sleep");
     const waterTrend = trendFor(context, "water");
     const stepsTrend = trendFor(context, "steps");
@@ -60,6 +61,60 @@ export class PredictiveSignalEngine {
         severity: sleepLowCount >= 3 || context.sleepScore < 60 ? "strong" : "moderate",
         repeatedCount: Math.max(sleepLowCount, context.sleepScore < 70 ? 1 : 0),
         source: "trend",
+      }));
+    }
+
+    for (const drift of trendIntelligence?.habitDrifts ?? []) {
+      const category = drift.metric === "hydration_ml"
+        ? "hydration"
+        : drift.metric === "sleep_minutes"
+          ? "sleep"
+          : drift.metric === "steps" || drift.metric === "activity_minutes"
+            ? "activity"
+            : drift.metric === "heart_rate_avg"
+              ? "recovery"
+              : undefined;
+
+      if (!category) continue;
+
+      signals.push(signal(`trend-drift-${drift.type}`, category, drift.message, {
+        severity: drift.severity === "high" ? "strong" : drift.severity === "medium" ? "moderate" : "minor",
+        repeatedCount: Math.max(2, Math.min(4, drift.daysObserved)),
+        source: "trend",
+      }));
+    }
+
+    for (const trend of trendIntelligence?.topTrends ?? []) {
+      if (!trend.abnormalChange || trend.direction === "insufficient_data") continue;
+
+      const category = trend.metric === "hydration_ml"
+        ? "hydration"
+        : trend.metric === "sleep_minutes"
+          ? "sleep"
+          : trend.metric === "steps" || trend.metric === "activity_minutes"
+            ? "activity"
+            : trend.metric === "heart_rate_avg"
+              ? "recovery"
+              : trend.metric === "calories_burned"
+                ? "nutrition"
+                : undefined;
+
+      if (!category) continue;
+
+      signals.push(signal(`trend-abnormal-${trend.metric}`, category, `${trend.label} changed ${Math.abs(trend.percentageChange)}% versus baseline.`, {
+        value: trend.latestValue,
+        severity: Math.abs(trend.percentageChange) >= 25 ? "strong" : "moderate",
+        repeatedCount: Math.max(1, Math.min(3, trend.dataPointsUsed - 2)),
+        source: "trend",
+      }));
+    }
+
+    if (trendIntelligence?.dataQuality === "stale" || trendIntelligence?.dataQuality === "limited" || trendIntelligence?.dataQuality === "insufficient") {
+      signals.push(signal("trend-intelligence-quality", "device_data", `Trend data quality is ${trendIntelligence.dataQuality}.`, {
+        value: trendIntelligence.dataQuality,
+        severity: trendIntelligence.dataQuality === "insufficient" ? "strong" : "moderate",
+        repeatedCount: 1,
+        source: "data_quality",
       }));
     }
 

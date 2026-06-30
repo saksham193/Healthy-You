@@ -304,6 +304,38 @@ export type HealthScore = {
 
 export type DeviceSyncStatus = "idle" | "syncing" | "synced" | "error";
 
+export type ProfileSyncStatus = "idle" | "syncing" | "synced" | "pending" | "offline" | "failed";
+
+export type HealthBackupStatus = "idle" | "syncing" | "synced" | "pending" | "offline" | "failed";
+
+export type HealthSummaryBackup = {
+  id: string;
+  date: string;
+  source: "health_connect" | "apple_health" | "mock_health" | "cloud_summary" | "manual";
+  deviceSource: "live" | "cache" | "fallback" | "no_data" | "cloud_summary" | "unavailable";
+  displaySource: "Live Device Summary" | "Cloud Summary" | "Last synced summary" | "Historical summary";
+  summaryType: "daily";
+  metrics: {
+    steps?: number;
+    caloriesBurned?: number;
+    activeMinutes?: number;
+    sleepMinutes?: number;
+    hydrationMl?: number;
+    heartRateAvg?: number;
+  };
+  scores: {
+    healthScore?: number;
+    sleepScore?: number;
+    fitnessScore?: number;
+  };
+  syncMetadata: {
+    lastDeviceSyncAt: string | null;
+    provider?: ConnectedHealthDevice["provider"] | "cloud_summary";
+    status: "live" | "cache" | "fallback" | "no_data" | "cloud_summary" | "unavailable";
+  };
+  updatedAt: string;
+};
+
 export type ConnectedHealthDevice = ConnectedDevice & {
   provider: "Apple Watch" | "Apple Health" | "Google Fit" | "Samsung Health" | "Fitbit" | "Health Connect" | "Mock Health";
   lastSyncedAt: string | null;
@@ -391,12 +423,16 @@ export type AIIntent =
   | "activity_query"
   | "device_sync_query"
   | "health_score_query"
+  | "daily_briefing"
   | "general_wellness"
   | "medical_safety";
 
 export type ProfileSource = "store" | "memory" | "manual";
 
 export type PersonalHealthProfile = {
+  name?: string;
+  email?: string;
+  dateOfBirth?: string;
   demographics: {
     age?: number;
     gender?: string;
@@ -410,6 +446,8 @@ export type PersonalHealthProfile = {
   dietaryPreferences: string[];
   allergies: string[];
   chronicConditions: string[];
+  medications?: string[];
+  preferences?: Record<string, unknown>;
   activityLevel?: string;
   averageSleepHours?: number;
   medicationAdherence?: number;
@@ -442,12 +480,17 @@ export type PersonalHealthProfile = {
 };
 
 export type PartialPersonalHealthProfile = {
+  name?: string;
+  email?: string;
+  dateOfBirth?: string;
   demographics?: Partial<PersonalHealthProfile["demographics"]>;
   bodyMetrics?: Partial<PersonalHealthProfile["bodyMetrics"]>;
   goals?: string[];
   dietaryPreferences?: string[];
   allergies?: string[];
   chronicConditions?: string[];
+  medications?: string[];
+  preferences?: Record<string, unknown>;
   activityLevel?: string;
   averageSleepHours?: number;
   medicationAdherence?: number;
@@ -476,6 +519,13 @@ export type MemoryRecord = {
   confidence: number;
   createdAt: string;
   updatedAt: string;
+  content?: string;
+  summary?: string;
+  type?: MemoryCategory | "profile" | "preference" | "habit" | "conversation" | "health" | "nutrition" | "fitness" | "medication" | "sleep" | "other";
+  source?: "conversation" | "manual" | "profile" | "device" | "import";
+  importance?: number;
+  metadata?: Record<string, unknown>;
+  embedding?: number[] | null;
 };
 
 export type MemoryInput = Omit<MemoryRecord, "id" | "createdAt" | "updatedAt">;
@@ -522,6 +572,189 @@ export type TrendInsight = {
   message: string;
 };
 
+export type TrendIntelligenceMetric =
+  | "steps"
+  | "activity_minutes"
+  | "calories_burned"
+  | "sleep_minutes"
+  | "hydration_ml"
+  | "heart_rate_avg"
+  | "health_score";
+
+export type TrendIntelligenceDirection = "improving" | "declining" | "stable" | "insufficient_data";
+
+export type TrendIntelligenceConfidence = "low" | "medium" | "high";
+
+export type TrendIntelligenceDataQuality = "fresh" | "stale" | "limited" | "insufficient";
+
+export type HabitDriftType =
+  | "activity_drop"
+  | "sleep_below_baseline"
+  | "hydration_below_baseline"
+  | "weekly_activity_drop"
+  | "recovery_strain";
+
+export type HabitDriftSignal = {
+  id: string;
+  type: HabitDriftType;
+  metric: TrendIntelligenceMetric;
+  severity: "low" | "medium" | "high";
+  message: string;
+  daysObserved: number;
+  confidence: TrendIntelligenceConfidence;
+  reason: string;
+};
+
+export type TrendIntelligenceItem = {
+  id: string;
+  metric: TrendIntelligenceMetric;
+  label: string;
+  direction: TrendIntelligenceDirection;
+  period: "7d";
+  latestValue?: number;
+  baselineValue?: number;
+  percentageChange: number;
+  confidence: TrendIntelligenceConfidence;
+  dataPointsUsed: number;
+  dataQuality: TrendIntelligenceDataQuality;
+  source: "local_summary" | "device_cache" | "current_context" | "mixed";
+  reason: string;
+  interpretation: string;
+  abnormalChange: boolean;
+  habitDrift: boolean;
+};
+
+export type TrendIntelligenceSummary = {
+  generatedAt: string;
+  source: "local" | "offline_cache" | "mixed";
+  weeklySummary: string;
+  compactSummary: string[];
+  topTrends: TrendIntelligenceItem[];
+  metrics: TrendIntelligenceItem[];
+  habitDrifts: HabitDriftSignal[];
+  confidence: TrendIntelligenceConfidence;
+  dataQuality: TrendIntelligenceDataQuality;
+};
+
+export type GoalDomain =
+  | "activity"
+  | "sleep"
+  | "hydration"
+  | "nutrition"
+  | "medication_adherence"
+  | "recovery"
+  | "general_wellness";
+
+export type CoachingConfidence = "low" | "medium" | "high";
+
+export type CoachingGoal = {
+  id: string;
+  domain: GoalDomain;
+  title: string;
+  targetValue?: number;
+  unit?: string;
+  cadence: "daily" | "weekly" | "monthly";
+  baselineValue?: number;
+  currentValue?: number;
+  progressPercent: number;
+  difficulty: "easy" | "moderate" | "challenging";
+  status: "active" | "completed" | "paused" | "at_risk";
+  confidence: CoachingConfidence;
+  reason: string;
+  updatedAt: string;
+};
+
+export type CoachingHabit = {
+  id: string;
+  domain: GoalDomain;
+  title: string;
+  streakDays: number;
+  completionRate: number;
+  lastCompletedAt?: string;
+  status: "building" | "consistent" | "slipping" | "paused";
+  confidence: CoachingConfidence;
+  cue?: string;
+  suggestedNextAction?: string;
+  updatedAt: string;
+};
+
+export type CoachingRecommendation = {
+  id: string;
+  domain: GoalDomain;
+  message: string;
+  reason: string;
+  priority: "low" | "medium" | "high";
+  confidence: CoachingConfidence;
+  source: "goal" | "habit" | "trend" | "profile" | "memory";
+};
+
+export type GoalHabitCoachingSummary = {
+  generatedAt: string;
+  source: "local" | "offline_cache";
+  goals: CoachingGoal[];
+  habits: CoachingHabit[];
+  recommendations: CoachingRecommendation[];
+  compactSummary: string[];
+  progressScore: number;
+  atRiskCount: number;
+  confidence: CoachingConfidence;
+  dataQuality: TrendIntelligenceDataQuality;
+  suggestedNextAction?: string;
+};
+
+export type AIHealthInsightCategory =
+  | "activity"
+  | "sleep"
+  | "hydration"
+  | "nutrition"
+  | "recovery"
+  | "medication"
+  | "device_data"
+  | "general_wellness";
+
+export type AIHealthInsight = {
+  id: string;
+  category: AIHealthInsightCategory;
+  title: string;
+  summary: string;
+  priority: "low" | "medium" | "high";
+  confidence: "low" | "medium" | "high";
+  source: "live" | "cached" | "cloud_summary" | "local_summary" | "demo" | "mixed";
+  supportingSignals: string[];
+  explanation: string;
+  suggestedAction: string;
+  safetyLevel: "normal" | "caution" | "urgent";
+  createdAt: string;
+};
+
+export type AIInsightSummary = {
+  generatedAt: string;
+  source: "local" | "offline_cache" | "mixed";
+  topInsights: AIHealthInsight[];
+  allInsights: AIHealthInsight[];
+  compactSummary: string[];
+  confidence: "low" | "medium" | "high";
+  dataQuality: TrendIntelligenceDataQuality;
+};
+
+export type DailyHealthBriefing = {
+  id: string;
+  date: string;
+  title: string;
+  greeting: string;
+  summary: string;
+  topInsight?: string;
+  focusArea?: string;
+  goalStatus?: string;
+  habitStatus?: string;
+  trendHighlight?: string;
+  recommendedActions: string[];
+  dataSourceNote: string;
+  confidence: "low" | "medium" | "high";
+  safetyLevel: "normal" | "caution" | "urgent";
+  generatedAt: string;
+};
+
 export type DailyInsightType =
   | "morning_summary"
   | "health_win"
@@ -544,6 +777,147 @@ export type PersonalizedRecommendation = {
   message: string;
   reason: string;
   priority: "low" | "medium" | "high";
+};
+
+export type RecommendationCategory =
+  | "activity"
+  | "sleep"
+  | "hydration"
+  | "nutrition"
+  | "recovery"
+  | "medication"
+  | "device_data"
+  | "general_wellness";
+
+export type RecommendationSource =
+  | "briefing"
+  | "insight"
+  | "goal"
+  | "habit"
+  | "trend"
+  | "prediction"
+  | "prevention"
+  | "device"
+  | "memory"
+  | "agent"
+  | "fallback";
+
+export type RecommendationCandidate = {
+  id: string;
+  title: string;
+  summary: string;
+  category: RecommendationCategory;
+  source: RecommendationSource;
+  supportingSources?: RecommendationSource[];
+  priority: "low" | "medium" | "high";
+  confidence: "low" | "medium" | "high";
+  action: string;
+  reason: string;
+  safetyLevel: "normal" | "caution" | "urgent";
+  dedupeKey: string;
+  createdAt: string;
+};
+
+export type RecommendationDecision = {
+  id: string;
+  primary: RecommendationCandidate;
+  alternatives: RecommendationCandidate[];
+  suppressed: RecommendationCandidate[];
+  rankingReason: string;
+  confidence: "low" | "medium" | "high";
+  generatedAt: string;
+};
+
+export type CoachingStyle = "friendly" | "motivational" | "professional" | "scientific" | "minimal";
+
+export type PreferredResponseLength = "minimal" | "concise" | "detailed";
+
+export type LearnedPreference = {
+  id: string;
+  key: string;
+  label: string;
+  value: string;
+  confidence: number;
+  evidenceCount: number;
+  source: "conversation" | "behavior" | "profile" | "device";
+  updatedAt: string;
+};
+
+export type PersonalizationSignal = {
+  id: string;
+  label: string;
+  value: string | number;
+  confidence: number;
+};
+
+export type UserIntelligenceProfile = {
+  generatedAt: string;
+  fitnessLevel: string;
+  activityPattern: string;
+  sleepPattern: string;
+  hydrationPattern: string;
+  nutritionPattern: string;
+  stressPattern: string;
+  motivationStyle: string;
+  preferredCoachingStyle: CoachingStyle;
+  preferredResponseLength: PreferredResponseLength;
+  healthGoals: string[];
+  riskFactors: string[];
+  behaviorConfidence: number;
+  learningConfidence: number;
+  personalizationScore: number;
+  learnedPreferences: LearnedPreference[];
+  signals: PersonalizationSignal[];
+};
+
+export type PreventiveRiskCategory =
+  | "sleep"
+  | "activity"
+  | "hydration"
+  | "recovery"
+  | "habit"
+  | "device_quality"
+  | "general";
+
+export type PreventiveRiskSeverity = "low" | "medium" | "high";
+
+export type PreventiveRiskConfidence = "low" | "medium" | "high";
+
+export type PreventiveRiskSource =
+  | "trend"
+  | "prediction"
+  | "briefing"
+  | "recommendation"
+  | "insight"
+  | "goal"
+  | "habit"
+  | "device";
+
+export type PreventiveRisk = {
+  id: string;
+  category: PreventiveRiskCategory;
+  severity: PreventiveRiskSeverity;
+  confidence: PreventiveRiskConfidence;
+  title: string;
+  summary: string;
+  explanation: string;
+  suggestedAction: string;
+  supportingSignals: string[];
+  source: PreventiveRiskSource;
+  safetyLevel: "normal" | "caution";
+  generatedAt: string;
+};
+
+export type PreventiveHealthSummary = {
+  generatedAt: string;
+  overallRisk: "low" | "medium" | "high";
+  primaryRisk?: PreventiveRisk;
+  focus: PreventiveRiskCategory | "none";
+  confidence: PreventiveRiskConfidence;
+  topActions: string[];
+  risks: PreventiveRisk[];
+  compactSummary: string[];
+  safetyLevel: "normal" | "caution";
 };
 
 export type AIContext = {
@@ -599,8 +973,15 @@ export type AIContext = {
   profile: PersonalHealthProfile;
   memory: MemoryRecord[];
   trends: HealthTrend[];
+  trendIntelligence: TrendIntelligenceSummary;
+  goalHabitCoaching: GoalHabitCoachingSummary;
+  aiInsights: AIInsightSummary;
+  dailyBriefing: DailyHealthBriefing;
+  recommendationDecision: RecommendationDecision;
+  preventiveSummary: PreventiveHealthSummary;
   insights: DailyInsight[];
   personalizedRecommendations: PersonalizedRecommendation[];
+  intelligenceProfile: UserIntelligenceProfile;
   predictions: PredictionSummary;
 };
 
@@ -705,6 +1086,38 @@ export type AIResponseMetadata = {
   metricDirectAnswerUsed?: boolean;
   deviceDataSource?: AIContext["deviceDataSource"];
   deviceDataStatus?: AIContext["deviceDataStatus"];
+  personalizationScore?: number;
+  coachingStyle?: CoachingStyle;
+  preferredResponseLength?: PreferredResponseLength;
+  learnedPreferenceCount?: number;
+  trendConfidence?: TrendIntelligenceConfidence;
+  trendDataQuality?: TrendIntelligenceDataQuality;
+  trendSignalCount?: number;
+  coachingProgressScore?: number;
+  activeGoalCount?: number;
+  atRiskHabitCount?: number;
+  topInsightCategory?: AIHealthInsightCategory;
+  topInsightPriority?: AIHealthInsight["priority"];
+  topInsightConfidence?: AIHealthInsight["confidence"];
+  insightCount?: number;
+  briefingGeneratedAt?: string;
+  briefingRecommendedActionCount?: number;
+  briefingFocusArea?: string;
+  briefingConfidence?: DailyHealthBriefing["confidence"];
+  briefingSafetyLevel?: DailyHealthBriefing["safetyLevel"];
+  recommendationDecisionId?: string;
+  recommendationPrimaryAction?: string;
+  recommendationPrimaryCategory?: RecommendationCategory;
+  recommendationPrimarySource?: RecommendationSource;
+  recommendationDecisionConfidence?: RecommendationDecision["confidence"];
+  recommendationAlternativeCount?: number;
+  recommendationSuppressedCount?: number;
+  recommendationRankingReason?: string;
+  preventiveOverallRisk?: PreventiveHealthSummary["overallRisk"];
+  preventivePrimaryRisk?: string;
+  preventiveFocus?: PreventiveHealthSummary["focus"];
+  preventiveConfidence?: PreventiveHealthSummary["confidence"];
+  preventiveRiskCount?: number;
 };
 
 export type MedicalKnowledgeCitation = {
@@ -757,6 +1170,7 @@ export type HealthDataState = {
   sleep: SleepData | null;
   schedule: ScheduleData | null;
   profile: ProfileData | null;
+  personalProfile: PersonalHealthProfile | null;
   vitals: VitalsData | null;
   devices: ConnectedHealthDevice[];
   deviceSyncStatus: DeviceSyncStatus;
@@ -764,6 +1178,16 @@ export type HealthDataState = {
   deviceDataStale: boolean;
   lastHealthSyncAt: string | null;
   deviceSyncError: string | null;
+  profileSyncStatus: ProfileSyncStatus;
+  profileSyncError: string | null;
+  lastProfileSyncAt: string | null;
+  queuedProfileUpdateCount: number;
+  healthSummaries: HealthSummaryBackup[];
+  latestHealthSummary: HealthSummaryBackup | null;
+  healthBackupStatus: HealthBackupStatus;
+  healthBackupError: string | null;
+  queuedHealthSummaryBackupCount: number;
+  lastHealthSummaryBackupAt: string | null;
   loading: boolean;
   error: string | null;
 };

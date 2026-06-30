@@ -77,7 +77,7 @@ export function evaluateHealthSafety(message: string, intent: AIIntent): SafetyR
       /\bface droop(?:ing)?\b/,
       /\bslurred speech\b/,
       /\bone[-\s]?sided weakness\b/,
-      /\boverdose\b/,
+      /\boverdos(?:e|ed|ing)\b/,
       /\bunconscious\b/,
       /\bemergency\b/,
     ])

@@ -1,5 +1,5 @@
 import React from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import AchievementCard from "../../components/profile/AchievementCard";
 import ConnectedDeviceCard from "../../components/profile/ConnectedDeviceCard";
 import EmergencyContactCard from "../../components/profile/EmergencyContactCard";
@@ -18,16 +18,38 @@ import CustomCard from "../../components/common/CustomCard";
 import ScreenContainer from "../../components/common/ScreenContainer";
 import { useDevices } from "../../hooks/useDevices";
 import { useHealthData } from "../../hooks/useHealthData";
+import { useAuthStore } from "../../store/authStore";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 
 export default function ProfileScreen() {
+  const authUser = useAuthStore((state) => state.user);
+  const isAuthLoading = useAuthStore((state) => state.isLoading);
+  const logout = useAuthStore((state) => state.logout);
   const { data, error, loading } = useHealthData();
   const devices = useDevices();
   const profile = data.profile;
   const healthScore = data.healthScore;
   const isDeviceSyncing = devices.syncStatus === "syncing";
+  const profileSyncLabel = (() => {
+    if (data.profileSyncStatus === "synced") return "Synced";
+    if (data.profileSyncStatus === "pending") return "Sync pending";
+    if (data.profileSyncStatus === "offline") return "Offline changes saved";
+    if (data.profileSyncStatus === "failed") return "Sync failed";
+    if (data.profileSyncStatus === "syncing") return "Syncing";
+
+    return "Local profile";
+  })();
+  const healthBackupLabel = (() => {
+    if (data.healthBackupStatus === "synced") return "Health backup: Synced";
+    if (data.healthBackupStatus === "pending") return "Health backup: Pending";
+    if (data.healthBackupStatus === "offline") return "Health backup: Offline saved";
+    if (data.healthBackupStatus === "failed") return "Health backup: Sync failed";
+    if (data.healthBackupStatus === "syncing") return "Health backup: Syncing";
+
+    return data.latestHealthSummary?.displaySource ?? "Health backup: Local";
+  })();
 
   if (!profile || !healthScore) {
     return (
@@ -58,6 +80,18 @@ export default function ProfileScreen() {
   };
   const handleEditProfile = () => {
     Alert.alert("Edit Profile", "Profile editing will open when account settings are connected.");
+  };
+  const handleLogout = () => {
+    Alert.alert("Log out", "You will return to the sign-in screen. Local health and chat cache stays on this device.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log Out",
+        style: "destructive",
+        onPress: () => {
+          void logout();
+        },
+      },
+    ]);
   };
 
   return (
@@ -178,6 +212,33 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        <DashboardSection title="Account" />
+        <CustomCard style={styles.accountCard}>
+          <View style={styles.accountCopy}>
+            <Text style={styles.accountName}>{authUser?.name ?? profile.summary.name}</Text>
+            <Text style={styles.accountEmail}>{authUser?.email ?? "Signed in on this device"}</Text>
+            <Text style={styles.syncStatus}>
+              {profileSyncLabel}
+              {data.queuedProfileUpdateCount > 0 ? ` (${data.queuedProfileUpdateCount})` : ""}
+            </Text>
+            <Text style={styles.syncStatus}>
+              {healthBackupLabel}
+              {data.queuedHealthSummaryBackupCount > 0 ? ` (${data.queuedHealthSummaryBackupCount})` : ""}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isAuthLoading}
+            onPress={handleLogout}
+            style={({ pressed }) => [
+              styles.logoutButton,
+              (pressed || isAuthLoading) && styles.logoutButtonPressed,
+            ]}
+          >
+            <Text style={styles.logoutText}>{isAuthLoading ? "Signing out..." : "Log Out"}</Text>
+          </Pressable>
+        </CustomCard>
+
         <DashboardSection title="Quick Actions" />
         <ScrollView
           horizontal
@@ -277,5 +338,48 @@ const styles = StyleSheet.create({
   },
   actionItem: {
     minWidth: SPACING.cardMinWidth,
+  },
+  accountCard: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.md,
+  },
+  accountCopy: {
+    flex: 1,
+    minWidth: SPACING.cardMinWidth,
+  },
+  accountName: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  accountEmail: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    marginTop: SPACING.xs,
+  },
+  syncStatus: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    marginTop: SPACING.xs,
+  },
+  logoutButton: {
+    alignItems: "center",
+    borderColor: COLORS.danger,
+    borderRadius: 16,
+    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.lg,
+  },
+  logoutButtonPressed: {
+    opacity: 0.72,
+  },
+  logoutText: {
+    color: COLORS.danger,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
   },
 });

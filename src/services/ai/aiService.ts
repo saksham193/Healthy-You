@@ -14,6 +14,7 @@ import { getAIProvider, getOfflineAIProvider } from "./providers/AIProviderFacto
 import { generatePersonalizedRecommendations } from "./recommendation/RecommendationEngineV2";
 import { evaluateHealthSafety } from "./safety/HealthSafetyGuard";
 import { generateHealthTrends } from "./trends/HealthTrendEngine";
+import { learnPreferencesFromInteraction } from "./personalization/PersonalizationEngine";
 import { traceIdService } from "../observability/TraceIdService";
 import { healthOrchestrator, ORCHESTRATOR_VERSION } from "../agents/HealthOrchestrator";
 import { createAITimingTrace, markAITiming, type AITimingTrace } from "./aiTiming";
@@ -77,7 +78,14 @@ const createRequest = async (message: string, intent: AIIntent): Promise<AIReque
       void syncProfile(profile).catch(() => undefined);
     }
   });
-  const memories = await longTermMemory.getRelevantLocalMemories(message);
+  const allLocalMemories = await longTermMemory.getMemories();
+  const relevantMemories = await longTermMemory.getRelevantLocalMemories(message);
+  const learnedPreferenceMemories = allLocalMemories.filter(
+    (memory) => memory.metadata?.personalizationPreference === true,
+  );
+  const memories = Array.from(
+    new Map([...relevantMemories, ...learnedPreferenceMemories, ...allLocalMemories].map((memory) => [memory.id, memory])).values(),
+  );
   const trends = generateHealthTrends();
   const conversation = conversationMemory.getMessages();
   const draftContext = buildHealthContext({
@@ -203,6 +211,15 @@ const rememberConversation = (message: string, response: AIResponse): void => {
 const runPostResponseTasks = (request: AIRequest, response: AIResponse, timing: AITimingTrace): void => {
   markAITiming(timing, "memory save", { awaited: false });
   runBackground("memory save", () => longTermMemory.saveMemoriesFromMessage(request.message));
+  markAITiming(timing, "personalization learning", { awaited: false });
+  runBackground("personalization learning", () =>
+    learnPreferencesFromInteraction({
+      message: request.message,
+      response: response.response,
+      context: request.context,
+      conversation: request.conversation,
+    }),
+  );
   markAITiming(timing, "response cache", { awaited: false });
   runBackground("response cache", () => cachedAIResponseStore.cacheResponse(request, response));
 };
@@ -255,6 +272,9 @@ async function sendIntentMessage(message: string, intent: AIIntent, timing: AITi
   if (directAnswer) {
     debugAIRoute("provider selected", { provider: "direct_local" });
     debugAIRoute("metric direct-answer used", { used: true });
+    const topInsight = directRequest.context.aiInsights.topInsights[0];
+    const decision = directRequest.context.recommendationDecision;
+    const preventive = directRequest.context.preventiveSummary;
     const response: AIResponse = {
       ...directAnswer,
       metadata: {
@@ -262,6 +282,38 @@ async function sendIntentMessage(message: string, intent: AIIntent, timing: AITi
         traceId: directRequest.traceId,
         deviceDataSource: directRequest.context.deviceDataSource,
         deviceDataStatus: directRequest.context.deviceDataStatus,
+        personalizationScore: directRequest.context.intelligenceProfile.personalizationScore,
+        coachingStyle: directRequest.context.intelligenceProfile.preferredCoachingStyle,
+        preferredResponseLength: directRequest.context.intelligenceProfile.preferredResponseLength,
+        learnedPreferenceCount: directRequest.context.intelligenceProfile.learnedPreferences.length,
+        trendConfidence: directRequest.context.trendIntelligence.confidence,
+        trendDataQuality: directRequest.context.trendIntelligence.dataQuality,
+        trendSignalCount: directRequest.context.trendIntelligence.topTrends.length,
+        coachingProgressScore: directRequest.context.goalHabitCoaching.progressScore,
+        activeGoalCount: directRequest.context.goalHabitCoaching.goals.filter((goal) => goal.status === "active" || goal.status === "at_risk").length,
+        atRiskHabitCount: directRequest.context.goalHabitCoaching.atRiskCount,
+        topInsightCategory: topInsight?.category,
+        topInsightPriority: topInsight?.priority,
+        topInsightConfidence: topInsight?.confidence,
+        insightCount: directRequest.context.aiInsights.allInsights.length,
+        briefingGeneratedAt: directRequest.context.dailyBriefing.generatedAt,
+        briefingRecommendedActionCount: directRequest.context.dailyBriefing.recommendedActions.length,
+        briefingFocusArea: directRequest.context.dailyBriefing.focusArea,
+        briefingConfidence: directRequest.context.dailyBriefing.confidence,
+        briefingSafetyLevel: directRequest.context.dailyBriefing.safetyLevel,
+        recommendationDecisionId: decision.id,
+        recommendationPrimaryAction: decision.primary.action,
+        recommendationPrimaryCategory: decision.primary.category,
+        recommendationPrimarySource: decision.primary.source,
+        recommendationDecisionConfidence: decision.confidence,
+        recommendationAlternativeCount: decision.alternatives.length,
+        recommendationSuppressedCount: decision.suppressed.length,
+        recommendationRankingReason: decision.rankingReason,
+        preventiveOverallRisk: preventive.overallRisk,
+        preventivePrimaryRisk: preventive.primaryRisk?.title,
+        preventiveFocus: preventive.focus,
+        preventiveConfidence: preventive.confidence,
+        preventiveRiskCount: preventive.risks.length,
       },
     };
 

@@ -38,6 +38,13 @@ export function initializeDatabase(): void {
       confidence REAL NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
+      content TEXT,
+      summary TEXT,
+      type TEXT,
+      source TEXT,
+      importance REAL,
+      metadata_json TEXT,
+      embedding_json TEXT,
       PRIMARY KEY (id, user_id),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
@@ -46,6 +53,22 @@ export function initializeDatabase(): void {
       user_id TEXT PRIMARY KEY,
       profile_json TEXT NOT NULL,
       updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS health_summaries (
+      id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      source TEXT NOT NULL,
+      device_source TEXT NOT NULL,
+      display_source TEXT NOT NULL,
+      summary_type TEXT NOT NULL,
+      metrics_json TEXT NOT NULL,
+      scores_json TEXT NOT NULL,
+      sync_metadata_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, date, summary_type),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
@@ -58,4 +81,20 @@ export function initializeDatabase(): void {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
+
+  const memoryColumns = database.pragma("table_info(memories)") as Array<{ name: string }>;
+  const existingMemoryColumns = new Set(memoryColumns.map((column) => column.name));
+  const addMemoryColumn = (name: string, definition: string): void => {
+    if (!existingMemoryColumns.has(name)) {
+      database.prepare(`ALTER TABLE memories ADD COLUMN ${name} ${definition}`).run();
+    }
+  };
+
+  addMemoryColumn("content", "TEXT");
+  addMemoryColumn("summary", "TEXT");
+  addMemoryColumn("type", "TEXT");
+  addMemoryColumn("source", "TEXT");
+  addMemoryColumn("importance", "REAL");
+  addMemoryColumn("metadata_json", "TEXT");
+  addMemoryColumn("embedding_json", "TEXT");
 }

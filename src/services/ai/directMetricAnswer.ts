@@ -57,9 +57,19 @@ const userReportedSleepHours = (message: string): number | undefined => {
   return Number.isFinite(hours) ? hours : undefined;
 };
 
+const asksForTrend = (message: string): boolean =>
+  /\b(trend|trending|pattern|weekly|this week|last week|over time|improving|declining|progress|habit drift|focus on today)\b/i.test(message);
+
+const asksForBriefing = (message: string): boolean =>
+  /\b(briefing|health summary|daily summary|today'?s summary|today'?s health|how did i do yesterday|what should i focus on today|top health insight)\b/i.test(message);
+
 export function buildDirectMetricAnswer(message: string, intent: AIIntent, context: AIContext): ProviderResponse | null {
   const prefix = sourcePrefix(context);
   const selfReportedSleep = userReportedSleepHours(message);
+
+  if (asksForTrend(message) || asksForBriefing(message)) {
+    return null;
+  }
 
   if (hasNumber(selfReportedSleep) && /\btired|fatigue|exhausted|sleepy\b/i.test(message)) {
     const syncedHours = hasNumber(context.sleepMinutes) ? Math.round((context.sleepMinutes / 60) * 10) / 10 : undefined;

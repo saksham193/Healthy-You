@@ -28,15 +28,16 @@ export class SleepAgent implements HealthAgent {
     const recommendations: AgentRecommendation[] = [];
     const sleepHours = context.context.sleepMinutes ? Math.round((context.context.sleepMinutes / 60) * 10) / 10 : undefined;
     const sleepTrendRisk = context.context.trends.some((trend) => trend.metric === "sleep" && trend.riskIndicators.length > 0);
+    const sleepDrift = context.context.trendIntelligence?.habitDrifts.find((drift) => drift.metric === "sleep_minutes");
     const lowSleep = context.context.sleepScore > 0 && context.context.sleepScore < 75;
 
-    if (lowSleep || sleepTrendRisk) {
+    if (lowSleep || sleepTrendRisk || sleepDrift) {
       recommendations.push({
         id: "agent-sleep-routine",
         message: "Protect a consistent wind-down window tonight with dimmer screens and a steady bedtime.",
         priority: context.context.sleepScore < 60 ? "high" : "medium",
-        rationale: sleepTrendRisk ? "Sleep trend has risk indicators." : `Sleep score is ${context.context.sleepScore}.`,
-        source: sleepTrendRisk ? "device" : "agent",
+        rationale: sleepDrift?.reason ?? (sleepTrendRisk ? "Sleep trend has risk indicators." : `Sleep score is ${context.context.sleepScore}.`),
+        source: sleepTrendRisk || sleepDrift ? "device" : "agent",
       });
     }
 
@@ -75,6 +76,7 @@ export class SleepAgent implements HealthAgent {
           `sleepScore:${context.context.sleepScore}`,
           `sleepMinutes:${context.context.sleepMinutes ?? "unknown"}`,
           sleepTrendRisk ? "sleep_trend_risk" : "",
+          sleepDrift ? `sleepDrift:${sleepDrift.confidence}` : "",
         ].filter(Boolean),
         offlineCapable: true,
       },

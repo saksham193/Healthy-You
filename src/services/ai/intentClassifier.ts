@@ -24,6 +24,7 @@ export function getIntentDomain(intent: AIIntent): IntentDomain {
   if (intent === "hydration_query") return "hydration";
   if (intent === "device_sync_query") return "general";
   if (intent === "health_score_query") return "general";
+  if (intent === "daily_briefing") return "general";
   if (intent === "general_wellness") return "general";
   if (intent === "medical_safety") return "general";
 
@@ -36,6 +37,10 @@ export function classifyIntent(message: string): AIIntent {
 
   if (matches(normalized, [/\b(diabetes|cancer|disease|condition)\b/, /\bdiagnose\b/, /\bstop my medication\b/, /\bwhat dose\b/])) {
     return "medical_safety";
+  }
+
+  if (matches(normalized, [/\bbriefing\b/, /\bhealth summary\b/, /\bdaily summary\b/, /\btoday'?s health summary\b/, /\bgive me today'?s health summary\b/, /\bwhat should i focus on today\b/, /\bhow did i do yesterday\b/, /\btop health insight\b/])) {
+    return "daily_briefing";
   }
 
   if (matches(normalized, [/\bstep(s)?\b/, /\bwalked\b/]) && dataQuestionPrefix.test(normalized)) {

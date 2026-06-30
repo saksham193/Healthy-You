@@ -85,6 +85,38 @@ const createResponseText = (
   insights: HealthInsight[],
   recommendations: string[],
 ): string => {
+  const decision = request.context.recommendationDecision;
+
+  if (decision && /\b(top recommendation|recommendation|what should i do first|what should i do today|what should i focus on today|why did you recommend)\b/i.test(request.message)) {
+    return [
+      decision.primary.action,
+      "",
+      `Why: ${decision.rankingReason}`,
+      `Confidence: ${decision.confidence}.`,
+    ].join("\n");
+  }
+
+  if (request.intent === "daily_briefing") {
+    const briefing = request.context.dailyBriefing;
+    if (!briefing) {
+      return "I do not have enough local context for a daily briefing yet. Refresh Health Connect or ask for a current metric.";
+    }
+
+    const actionLines = briefing.recommendedActions.length > 0
+      ? formatRecommendations(briefing.recommendedActions.slice(0, 3))
+      : "- Keep one small wellness action today.";
+
+    return [
+      `${briefing.greeting} ${briefing.summary}`,
+      "",
+      `Focus: ${briefing.focusArea ?? "general wellness"}.`,
+      `Data note: ${briefing.dataSourceNote}`,
+      "",
+      "Recommended actions:",
+      actionLines,
+    ].join("\n");
+  }
+
   const relevantInsights = findRelevantInsights(request.intent, insights);
   const insightLines = relevantInsights.length > 0
     ? relevantInsights.map((insight) => `- ${insight.message}`).join("\n")
@@ -93,6 +125,13 @@ const createResponseText = (
   return [
     getContextSummary(request.intent, request.context),
     getScoreInterpretation(request.intent, request.context),
+    `I am using a ${request.context.intelligenceProfile.preferredCoachingStyle} coaching style with ${request.context.intelligenceProfile.personalizationScore}% personalization confidence.`,
+    request.context.goalHabitCoaching.suggestedNextAction
+      ? `Current coaching focus: ${request.context.goalHabitCoaching.suggestedNextAction}`
+      : "",
+    request.context.aiInsights?.topInsights[0]
+      ? `Top insight: ${request.context.aiInsights.topInsights[0].title}. ${request.context.aiInsights.topInsights[0].summary}`
+      : "",
     "",
     "Possible contributing factors:",
     insightLines,
@@ -111,9 +150,19 @@ export class MockAIProvider implements AIProvider {
 
   async generateHealthResponse(request: AIRequest): Promise<ProviderResponse> {
     const insights = request.prompt.length > 0 ? generateHealthInsights(request.context) : [];
-    const recommendations = generateRecommendations(request.context, request.intent).map(
-      (recommendation) => recommendation.message,
-    );
+    const topInsight = request.context.aiInsights?.topInsights[0];
+    const briefing = request.context.dailyBriefing;
+    const decision = request.context.recommendationDecision;
+    const preventive = request.context.preventiveSummary;
+    const recommendations = (request.context.personalizedRecommendations ?? []).length > 0
+      ? request.context.personalizedRecommendations.map((recommendation) => recommendation.message)
+      : decision
+        ? [decision.primary.action, ...decision.alternatives.map((item) => item.action)]
+      : (request.context.dailyBriefing?.recommendedActions ?? []).length > 0
+        ? request.context.dailyBriefing?.recommendedActions ?? []
+      : generateRecommendations(request.context, request.intent).map(
+          (recommendation) => recommendation.message,
+        );
 
     return {
       id: createId(),
@@ -121,6 +170,42 @@ export class MockAIProvider implements AIProvider {
       response: createResponseText(request, insights, recommendations),
       suggestions: recommendations,
       provider: this.name,
+      metadata: {
+        source: "mock",
+        safetyLevel: "routine",
+        personalizationScore: request.context.intelligenceProfile?.personalizationScore,
+        coachingStyle: request.context.intelligenceProfile?.preferredCoachingStyle,
+        preferredResponseLength: request.context.intelligenceProfile?.preferredResponseLength,
+        learnedPreferenceCount: request.context.intelligenceProfile?.learnedPreferences.length,
+        trendConfidence: request.context.trendIntelligence?.confidence,
+        trendDataQuality: request.context.trendIntelligence?.dataQuality,
+        trendSignalCount: request.context.trendIntelligence?.topTrends.length,
+        coachingProgressScore: request.context.goalHabitCoaching?.progressScore,
+        activeGoalCount: request.context.goalHabitCoaching?.goals.filter((goal) => goal.status === "active" || goal.status === "at_risk").length,
+        atRiskHabitCount: request.context.goalHabitCoaching?.atRiskCount,
+        topInsightCategory: topInsight?.category,
+        topInsightPriority: topInsight?.priority,
+        topInsightConfidence: topInsight?.confidence,
+        insightCount: request.context.aiInsights?.allInsights.length,
+        briefingGeneratedAt: briefing?.generatedAt,
+        briefingRecommendedActionCount: briefing?.recommendedActions.length,
+        briefingFocusArea: briefing?.focusArea,
+        briefingConfidence: briefing?.confidence,
+        briefingSafetyLevel: briefing?.safetyLevel,
+        recommendationDecisionId: decision?.id,
+        recommendationPrimaryAction: decision?.primary.action,
+        recommendationPrimaryCategory: decision?.primary.category,
+        recommendationPrimarySource: decision?.primary.source,
+        recommendationDecisionConfidence: decision?.confidence,
+        recommendationAlternativeCount: decision?.alternatives.length,
+        recommendationSuppressedCount: decision?.suppressed.length,
+        recommendationRankingReason: decision?.rankingReason,
+        preventiveOverallRisk: preventive?.overallRisk,
+        preventivePrimaryRisk: preventive?.primaryRisk?.title,
+        preventiveFocus: preventive?.focus,
+        preventiveConfidence: preventive?.confidence,
+        preventiveRiskCount: preventive?.risks.length,
+      },
     };
   }
 

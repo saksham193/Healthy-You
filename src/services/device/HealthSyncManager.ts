@@ -18,7 +18,7 @@ const DEFAULT_PERIODIC_INTERVAL_MS = 30 * 60 * 1000;
 
 const withCacheSource = (metrics: DeviceHealthMetrics): DeviceHealthMetrics => ({
   ...metrics,
-  source: metrics.source === "fallback" || metrics.source === "no_data" ? metrics.source : "cache",
+  source: metrics.source === "fallback" ? "fallback" : "cache",
   syncStatus: "synced",
   isStale: true,
 });

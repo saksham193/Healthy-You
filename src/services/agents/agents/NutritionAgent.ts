@@ -32,13 +32,14 @@ export class NutritionAgent implements HealthAgent {
     const vegetarian = context.context.profile.dietaryPreferences.some((item) => /vegetarian|vegan/i.test(item)) ||
       context.context.memory.some((item) => item.category === "dietary_preference" && /vegetarian|vegan/i.test(item.value));
     const hydrationGap = context.context.hydrationGoal - context.context.hydrationGlasses;
+    const hydrationDrift = context.context.trendIntelligence?.habitDrifts.find((drift) => drift.metric === "hydration_ml");
 
-    if (hydrationGap > 0) {
+    if (hydrationGap > 0 || hydrationDrift) {
       recommendations.push({
         id: "agent-nutrition-hydration",
         message: "Close the hydration gap gradually with normal water intake if you are not on a fluid restriction.",
-        priority: priorityForNutrition(context.context),
-        rationale: `Hydration is ${context.context.hydrationGlasses}/${context.context.hydrationGoal || "unknown"} glasses.`,
+        priority: hydrationDrift ? "high" : priorityForNutrition(context.context),
+        rationale: hydrationDrift?.reason ?? `Hydration is ${context.context.hydrationGlasses}/${context.context.hydrationGoal || "unknown"} glasses.`,
         source: "device",
       });
     }
@@ -66,6 +67,7 @@ export class NutritionAgent implements HealthAgent {
     const signals = [
       `nutritionScore:${context.context.nutritionScore}`,
       `hydration:${context.context.hydrationGlasses}/${context.context.hydrationGoal}`,
+      hydrationDrift ? `hydrationDrift:${hydrationDrift.confidence}` : "",
       vegetarian ? "vegetarian_preference" : "",
     ].filter(Boolean);
 

@@ -62,6 +62,12 @@
     "validate:ai-quality": "node scripts/validate-ai-quality.js",
     "validate:multi-agent": "node scripts/validate-multi-agent.js",
     "validate:predictive-health": "node scripts/validate-predictive-health.js",
+    "validate:personalization-engine": "node scripts/validate-personalization-engine.js",
+    "validate:trend-intelligence": "node scripts/validate-trend-intelligence.js",
+    "validate:goal-habit-coaching": "node scripts/validate-goal-habit-coaching.js",
+    "validate:ai-insights": "node scripts/validate-ai-insights.js",
+    "validate:daily-health-briefing": "node scripts/validate-daily-health-briefing.js",
+    "validate:recommendation-decision": "node scripts/validate-recommendation-decision.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"

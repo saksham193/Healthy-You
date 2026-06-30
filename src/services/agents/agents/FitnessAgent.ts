@@ -29,15 +29,18 @@ export class FitnessAgent implements HealthAgent {
     const stepGap = context.context.stepGoal - context.context.steps;
     const highActivity = context.context.weeklyActivityMinutes >= 300;
     const lowReadiness = context.context.sleepScore > 0 && context.context.sleepScore < 65;
+    const activityDrift = context.context.trendIntelligence?.habitDrifts.find((drift) =>
+      drift.metric === "steps" || drift.metric === "activity_minutes",
+    );
 
-    if (stepGap > 0 && context.context.stepGoal > 0) {
+    if ((stepGap > 0 && context.context.stepGoal > 0) || activityDrift) {
       recommendations.push({
         id: "agent-fitness-step-gap",
         message: lowReadiness
           ? "Favor gentle movement today, such as an easy walk or mobility break."
           : "Add a short walk or movement break if you feel well.",
-        priority: stepGap > context.context.stepGoal * 0.5 ? "high" : "medium",
-        rationale: `Steps are ${context.context.steps}/${context.context.stepGoal}.`,
+        priority: activityDrift || stepGap > context.context.stepGoal * 0.5 ? "high" : "medium",
+        rationale: activityDrift?.reason ?? `Steps are ${context.context.steps}/${context.context.stepGoal}.`,
         source: "device",
       });
     }
@@ -90,7 +93,8 @@ export class FitnessAgent implements HealthAgent {
           `steps:${context.context.steps}/${context.context.stepGoal}`,
           `weeklyActivityMinutes:${context.context.weeklyActivityMinutes}`,
           `deviceDataSource:${context.context.deviceDataSource}`,
-        ],
+          activityDrift ? `activityDrift:${activityDrift.confidence}` : "",
+        ].filter(Boolean),
         offlineCapable: true,
       },
     };

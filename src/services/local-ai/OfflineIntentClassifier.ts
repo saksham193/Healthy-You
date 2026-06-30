@@ -17,6 +17,18 @@ const intentPatterns: Array<{ intent: OfflineIntent; patterns: RegExp[] }> = [
     ],
   },
   {
+    intent: "daily_briefing",
+    patterns: [
+      /\bbriefing\b/i,
+      /\bhealth summary\b/i,
+      /\bdaily summary\b/i,
+      /\btoday'?s health summary\b/i,
+      /\bwhat should i focus on today\b/i,
+      /\bhow did i do yesterday\b/i,
+      /\btop health insight\b/i,
+    ],
+  },
+  {
     intent: "device_status",
     patterns: [
       /\b(sync|synced|wearable|watch|device|health connect|apple health|google fit|fitbit|permission|stale)\b/i,

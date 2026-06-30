@@ -1,7 +1,14 @@
 import { useHealthStore } from "../../store/healthStore";
 import type { AIContext, AIOrchestrationContext } from "../../types";
+import { dailyHealthBriefingEngine } from "../briefing/DailyHealthBriefingEngine";
+import { goalHabitCoachingEngine } from "../coaching/GoalHabitCoachingEngine";
+import { aiInsightEngine } from "../insights/AIInsightEngine";
 import { predictionOrchestrator } from "../prediction/PredictionOrchestrator";
+import { trendIntelligenceEngine } from "../prediction/TrendIntelligenceEngine";
+import { preventiveHealthEngine } from "../prevention/PreventiveHealthEngine";
+import { buildUserIntelligenceProfile } from "./personalization/PersonalizationEngine";
 import { buildProfile } from "./profile/ProfileBuilder";
+import { recommendationDecisionOrchestrator } from "./recommendation/RecommendationDecisionOrchestrator";
 
 const fallbackCurrentHealthData: AIContext["currentHealthData"] = {
   healthScore: 0,
@@ -19,24 +26,7 @@ const fallbackCurrentHealthData: AIContext["currentHealthData"] = {
   stepPercent: 0,
 };
 
-const getFallbackContext = (): AIContext => ({
-  ...fallbackCurrentHealthData,
-  adherenceScore: fallbackCurrentHealthData.medicationAdherence,
-  nutritionStatus: "Unavailable",
-  fitnessStatus: "Unavailable",
-  sleepStatus: "Unavailable",
-  medicationAdherenceStatus: "Unavailable",
-  hydrationStatus: "Unavailable",
-  deviceDataSource: "unavailable",
-  deviceDataStatus: "unavailable",
-  lastDeviceSyncAt: null,
-  currentHealthData: fallbackCurrentHealthData,
-  profile: buildProfile(),
-  memory: [],
-  trends: [],
-  insights: [],
-  personalizedRecommendations: [],
-  predictions: {
+const emptyPredictions = (): AIContext["predictions"] => ({
     topPredictions: [],
     allPredictions: [],
     insights: [],
@@ -49,8 +39,181 @@ const getFallbackContext = (): AIContext => ({
       averageConfidence: 0,
       dataQualityIssues: 1,
     },
-  },
 });
+
+const emptyAIInsights = (): AIContext["aiInsights"] => ({
+  generatedAt: new Date().toISOString(),
+  source: "local",
+  topInsights: [],
+  allInsights: [],
+  compactSummary: [],
+  confidence: "low",
+  dataQuality: "insufficient",
+});
+
+const emptyDailyBriefing = (): AIContext["dailyBriefing"] => ({
+  id: "daily-briefing-unavailable",
+  date: new Date().toISOString().slice(0, 10),
+  title: "Daily health briefing",
+  greeting: "Today's briefing.",
+  summary: "Not enough local health context is available yet. Refresh Health Connect or add recent summaries to improve this briefing.",
+  recommendedActions: ["Refresh Health Connect when available."],
+  dataSourceNote: "This briefing uses the latest local Healthy You context available.",
+  confidence: "low",
+  safetyLevel: "normal",
+  generatedAt: new Date().toISOString(),
+});
+
+const emptyRecommendationDecision = (): AIContext["recommendationDecision"] => {
+  const generatedAt = new Date().toISOString();
+  const primary = {
+    id: "recommendation-fallback-unavailable",
+    title: "Refresh health context",
+    summary: "Not enough local context is available for a ranked recommendation yet.",
+    category: "general_wellness" as const,
+    source: "fallback" as const,
+    supportingSources: ["fallback" as const],
+    priority: "low" as const,
+    confidence: "low" as const,
+    action: "Refresh Health Connect or add recent summaries when available.",
+    reason: "Recommendation decision is waiting for fresh local health context.",
+    safetyLevel: "normal" as const,
+    dedupeKey: "general_wellness:refresh health context",
+    createdAt: generatedAt,
+  };
+
+  return {
+    id: "recommendation-decision-unavailable",
+    primary,
+    alternatives: [],
+    suppressed: [],
+    rankingReason: "No ranked recommendation could be generated from the current local context.",
+    confidence: "low",
+    generatedAt,
+  };
+};
+
+const emptyPreventiveSummary = (): AIContext["preventiveSummary"] => ({
+  generatedAt: new Date().toISOString(),
+  overallRisk: "low",
+  focus: "none",
+  confidence: "low",
+  topActions: [],
+  risks: [],
+  compactSummary: [
+    "Overall Wellness Risk: low",
+    "Primary Risk: No strong preventive wellness risk",
+    "Confidence: low",
+    "Suggested Focus: General wellness",
+  ],
+  safetyLevel: "normal",
+});
+
+const getFallbackContext = (): AIContext => {
+  const profile = buildProfile();
+  const baseContext = {
+    ...fallbackCurrentHealthData,
+    adherenceScore: fallbackCurrentHealthData.medicationAdherence,
+    nutritionStatus: "Unavailable",
+    fitnessStatus: "Unavailable",
+    sleepStatus: "Unavailable",
+    medicationAdherenceStatus: "Unavailable",
+    hydrationStatus: "Unavailable",
+    deviceDataSource: "unavailable" as const,
+    deviceDataStatus: "unavailable" as const,
+    lastDeviceSyncAt: null,
+    currentHealthData: fallbackCurrentHealthData,
+    profile,
+    memory: [],
+    trends: [],
+    insights: [],
+    personalizedRecommendations: [],
+  };
+
+  const intelligenceProfile = buildUserIntelligenceProfile({
+    profile,
+    context: baseContext,
+    memories: [],
+  });
+  const trendIntelligence = trendIntelligenceEngine.analyze({
+    summaries: [],
+    context: baseContext,
+    intelligenceProfile,
+  });
+  const goalHabitCoaching = goalHabitCoachingEngine.generate({
+    summaries: [],
+    context: baseContext,
+    trendIntelligence,
+    intelligenceProfile,
+    memories: [],
+  });
+  const predictions = emptyPredictions();
+  const aiInsights = aiInsightEngine.generate({
+    summaries: [],
+    context: baseContext,
+    trendIntelligence,
+    goalHabitCoaching,
+    predictions,
+    intelligenceProfile,
+    memories: [],
+  });
+  const preventiveSummary = preventiveHealthEngine.generate({
+    summaries: [],
+    context: baseContext,
+    trendIntelligence,
+    goalHabitCoaching,
+    aiInsights,
+    predictions,
+    intelligenceProfile,
+  });
+  const dailyBriefing = dailyHealthBriefingEngine.generate({
+    summaries: [],
+    context: baseContext,
+    trendIntelligence,
+    goalHabitCoaching,
+    aiInsights,
+    predictions,
+    intelligenceProfile,
+    preventiveSummary,
+    memories: [],
+  });
+  const recommendationDecision = recommendationDecisionOrchestrator.generate({
+    context: {
+      ...baseContext,
+      intelligenceProfile,
+      trendIntelligence,
+      goalHabitCoaching,
+      aiInsights,
+      dailyBriefing,
+      recommendationDecision: emptyRecommendationDecision(),
+      preventiveSummary,
+      predictions,
+    },
+  });
+  const finalPreventiveSummary = preventiveHealthEngine.generate({
+    summaries: [],
+    context: baseContext,
+    trendIntelligence,
+    goalHabitCoaching,
+    aiInsights,
+    predictions,
+    intelligenceProfile,
+    dailyBriefing,
+    recommendationDecision,
+  });
+
+  return {
+    ...baseContext,
+    intelligenceProfile,
+    trendIntelligence,
+    goalHabitCoaching,
+    aiInsights,
+    dailyBriefing,
+    recommendationDecision,
+    preventiveSummary: finalPreventiveSummary,
+    predictions,
+  };
+};
 
 const getScoreStatus = (score: number): string => {
   if (score >= 85) return "Excellent";
@@ -130,11 +293,12 @@ export function buildHealthContext(orchestration?: Partial<AIOrchestrationContex
   const sleepQuality = getScoreStatus(sleepScore);
   const deviceDataSource = getDeviceDataSource(state);
   const deviceDataStatus = getDeviceDataStatus(deviceDataSource, state.deviceSyncStatus);
-  const devicePermissionStatus = deviceDataSource === "live" || deviceDataSource === "no_data"
-    ? "granted"
-    : deviceDataSource === "unavailable"
-      ? "unknown"
-      : undefined;
+  const devicePermissionStatus: AIContext["devicePermissionStatus"] =
+    deviceDataSource === "live" || deviceDataSource === "no_data"
+      ? "granted"
+      : deviceDataSource === "unavailable"
+        ? "unknown"
+        : undefined;
   const currentHealthData: AIContext["currentHealthData"] = {
     healthScore,
     nutritionScore,
@@ -154,7 +318,7 @@ export function buildHealthContext(orchestration?: Partial<AIOrchestrationContex
     stepPercent,
   };
 
-  const baseContext: AIContext = {
+  const baseContextWithoutIntelligence = {
     healthScore,
     nutritionScore,
     fitnessScore,
@@ -186,11 +350,99 @@ export function buildHealthContext(orchestration?: Partial<AIOrchestrationContex
     trends: orchestration?.trends ?? fallbackContext.trends,
     insights: orchestration?.insights ?? fallbackContext.insights,
     personalizedRecommendations: orchestration?.recommendations ?? fallbackContext.personalizedRecommendations,
+  };
+  const intelligenceProfile = buildUserIntelligenceProfile({
+    profile: baseContextWithoutIntelligence.profile,
+    context: baseContextWithoutIntelligence,
+    memories: baseContextWithoutIntelligence.memory,
+    conversation: orchestration?.conversation,
+  });
+  const summaries = state.healthSummaries.length > 0
+    ? state.healthSummaries
+    : state.latestHealthSummary
+      ? [state.latestHealthSummary]
+      : [];
+  const trendIntelligence = trendIntelligenceEngine.analyze({
+    summaries,
+    context: baseContextWithoutIntelligence,
+    intelligenceProfile,
+  });
+  const goalHabitCoaching = goalHabitCoachingEngine.generate({
+    summaries,
+    context: baseContextWithoutIntelligence,
+    trendIntelligence,
+    intelligenceProfile,
+    memories: baseContextWithoutIntelligence.memory,
+  });
+  const baseContext: AIContext = {
+    ...baseContextWithoutIntelligence,
+    intelligenceProfile,
+    trendIntelligence,
+    goalHabitCoaching,
+    aiInsights: fallbackContext.aiInsights ?? emptyAIInsights(),
+    dailyBriefing: fallbackContext.dailyBriefing ?? emptyDailyBriefing(),
+    recommendationDecision: fallbackContext.recommendationDecision ?? emptyRecommendationDecision(),
+    preventiveSummary: fallbackContext.preventiveSummary ?? emptyPreventiveSummary(),
     predictions: fallbackContext.predictions,
   };
+  const predictions = predictionOrchestrator.run(baseContext);
+  const aiInsights = aiInsightEngine.generate({
+    summaries,
+    context: baseContext,
+    trendIntelligence,
+    goalHabitCoaching,
+    predictions,
+    intelligenceProfile,
+    memories: baseContext.memory,
+  });
+  const preventiveSummaryForBriefing = preventiveHealthEngine.generate({
+    summaries,
+    context: baseContext,
+    trendIntelligence,
+    goalHabitCoaching,
+    aiInsights,
+    predictions,
+    intelligenceProfile,
+  });
+  const dailyBriefing = dailyHealthBriefingEngine.generate({
+    summaries,
+    context: baseContext,
+    trendIntelligence,
+    goalHabitCoaching,
+    aiInsights,
+    predictions,
+    intelligenceProfile,
+    preventiveSummary: preventiveSummaryForBriefing,
+    memories: baseContext.memory,
+  });
+  const contextBeforeDecision: AIContext = {
+    ...baseContext,
+    predictions,
+    aiInsights,
+    dailyBriefing,
+    preventiveSummary: preventiveSummaryForBriefing,
+  };
+  const recommendationDecision = recommendationDecisionOrchestrator.generate({
+    context: contextBeforeDecision,
+  });
+  const preventiveSummary = preventiveHealthEngine.generate({
+    summaries,
+    context: contextBeforeDecision,
+    trendIntelligence,
+    goalHabitCoaching,
+    aiInsights,
+    predictions,
+    intelligenceProfile,
+    dailyBriefing,
+    recommendationDecision,
+  });
 
   return {
     ...baseContext,
-    predictions: predictionOrchestrator.run(baseContext),
+    predictions,
+    aiInsights,
+    dailyBriefing,
+    recommendationDecision,
+    preventiveSummary,
   };
 }

@@ -14,6 +14,7 @@ export type OfflineIntent =
   | "medication"
   | "device_status"
   | "trend_summary"
+  | "daily_briefing"
   | "emergency"
   | "general_health"
   | "unknown";

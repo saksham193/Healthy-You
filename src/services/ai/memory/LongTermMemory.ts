@@ -1,7 +1,10 @@
 import type { MemoryInput, MemoryRecord, MemorySearchOptions } from "../types";
-import { deleteMemory as deleteRemoteMemory, fetchMemories, saveMemory as saveRemoteMemory } from "../../api/MemoryApi";
-import { offlineMemoryQueue } from "../../local-ai/OfflineMemoryQueue";
+import {
+  mergeLocalAndRemoteMemories,
+  offlineMemoryQueue,
+} from "../../local-ai/OfflineMemoryQueue";
 import { extractMemoriesFromMessage } from "./MemoryExtractor";
+import { filterCloudSafeMemories, isCloudSafeMemory } from "./MemoryPrivacy";
 import { memoryStore, type MemoryPersistence } from "./MemoryStore";
 
 const createId = (memory: MemoryInput): string =>
@@ -17,6 +20,35 @@ const matchesQuery = (record: MemoryRecord, query: string): boolean => {
   );
 };
 
+const categoryTypeMap: Record<MemoryRecord["category"], NonNullable<MemoryRecord["type"]>> = {
+  goal: "goal",
+  dietary_preference: "preference",
+  allergy: "health",
+  health_concern: "health",
+  medication_habit: "medication",
+  exercise_preference: "fitness",
+  recurring_topic: "conversation",
+  important_recommendation: "other",
+};
+
+const enrichMemoryRecord = (memory: MemoryInput, existing: MemoryRecord | undefined, now: string): MemoryRecord => ({
+  ...(existing ?? {}),
+  ...memory,
+  id: existing?.id ?? createId(memory),
+  content: memory.content ?? memory.value,
+  summary: memory.summary ?? memory.value,
+  type: memory.type ?? categoryTypeMap[memory.category] ?? "other",
+  source: memory.source ?? "conversation",
+  importance: memory.importance ?? Math.round(memory.confidence * 100),
+  metadata: {
+    ...(existing?.metadata ?? {}),
+    ...(memory.metadata ?? {}),
+    category: memory.category,
+  },
+  createdAt: existing?.createdAt ?? now,
+  updatedAt: now,
+});
+
 export class LongTermMemory {
   constructor(private readonly store: MemoryPersistence = memoryStore) {}
 
@@ -25,26 +57,19 @@ export class LongTermMemory {
     const id = createId(memory);
     const existing = records.find((record) => record.id === id);
     const now = new Date().toISOString();
-    const nextRecord: MemoryRecord = existing
-      ? {
-          ...existing,
-          sourceMessage: memory.sourceMessage,
-          confidence: Math.max(existing.confidence, memory.confidence),
-          updatedAt: now,
-        }
-      : {
-          ...memory,
-          id,
-          createdAt: now,
-          updatedAt: now,
-        };
+    const nextRecord = enrichMemoryRecord({
+      ...memory,
+      confidence: existing ? Math.max(existing.confidence, memory.confidence) : memory.confidence,
+    }, existing, now);
 
     const nextRecords = existing
       ? records.map((record) => (record.id === id ? nextRecord : record))
       : [...records, nextRecord];
 
     await this.store.write(nextRecords);
-    void offlineMemoryQueue.syncOrQueue(nextRecord).catch(() => undefined);
+    if (isCloudSafeMemory(nextRecord)) {
+      void offlineMemoryQueue.syncOrQueue(nextRecord).catch(() => undefined);
+    }
 
     return nextRecord;
   }
@@ -52,7 +77,7 @@ export class LongTermMemory {
   async saveMemories(memories: MemoryInput[]): Promise<MemoryRecord[]> {
     const saved: MemoryRecord[] = [];
 
-    for (const memory of memories) {
+    for (const memory of filterCloudSafeMemories(memories)) {
       saved.push(await this.saveMemory(memory));
     }
 
@@ -64,26 +89,31 @@ export class LongTermMemory {
   }
 
   async getMemories(): Promise<MemoryRecord[]> {
-    const localRecords = await this.store.read();
+    return this.store.read();
+  }
 
-    try {
-      const remoteRecords = await fetchMemories();
-      const merged = mergeRecords(localRecords, remoteRecords);
-      const remoteRecordsById = new Map(remoteRecords.map((record) => [record.id, record]));
-      const localRecordsToSync = localRecords.filter((record) => {
-        const remoteRecord = remoteRecordsById.get(record.id);
+  async syncMemoriesToCloud(): Promise<void> {
+    await offlineMemoryQueue.syncMemoriesToCloud(await this.store.read());
+  }
 
-        return !remoteRecord || record.updatedAt.localeCompare(remoteRecord.updatedAt) > 0;
-      });
+  async loadMemoriesFromCloud(): Promise<MemoryRecord[]> {
+    const merged = await offlineMemoryQueue.loadMemoriesFromCloud(await this.store.read());
 
-      await Promise.allSettled(localRecordsToSync.map((record) => saveRemoteMemory(record)));
+    await this.store.write(merged);
 
-      await this.store.write(merged);
+    return merged;
+  }
 
-      return merged;
-    } catch {
-      return localRecords;
-    }
+  async queueMemoryWrites(memories: MemoryRecord | MemoryRecord[]): Promise<void> {
+    await offlineMemoryQueue.queueMemoryWrites(memories);
+  }
+
+  async flushQueuedMemoryWrites(): Promise<void> {
+    await offlineMemoryQueue.flushQueuedMemoryWrites();
+  }
+
+  mergeLocalAndRemoteMemories(localRecords: MemoryRecord[], remoteRecords: MemoryRecord[]): MemoryRecord[] {
+    return mergeLocalAndRemoteMemories(localRecords, remoteRecords);
   }
 
   async searchMemories(options: MemorySearchOptions): Promise<MemoryRecord[]> {
@@ -130,22 +160,8 @@ export class LongTermMemory {
     const records = await this.store.read();
 
     await this.store.write(records.filter((record) => record.id !== id));
-    void deleteRemoteMemory(id).catch(() => undefined);
+    void offlineMemoryQueue.deleteSyncedMemory(id).catch(() => undefined);
   }
 }
 
 export const longTermMemory = new LongTermMemory();
-
-const mergeRecords = (localRecords: MemoryRecord[], remoteRecords: MemoryRecord[]): MemoryRecord[] => {
-  const recordsById = new Map<string, MemoryRecord>();
-
-  [...localRecords, ...remoteRecords].forEach((record) => {
-    const existing = recordsById.get(record.id);
-
-    if (!existing || record.updatedAt.localeCompare(existing.updatedAt) >= 0) {
-      recordsById.set(record.id, record);
-    }
-  });
-
-  return Array.from(recordsById.values()).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-};

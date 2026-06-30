@@ -19,6 +19,16 @@ type RequestOptions = {
 };
 
 const API_BASE_URL = resolveApiBaseUrl();
+let authFailureHandler: (() => void) | null = null;
+
+export function setAuthFailureHandler(handler: (() => void) | null): void {
+  authFailureHandler = handler;
+}
+
+async function clearSessionAfterAuthFailure(): Promise<void> {
+  await clearStoredTokens();
+  authFailureHandler?.();
+}
 
 const isApiErrorEnvelope = (value: unknown): value is ApiErrorEnvelope =>
   typeof value === "object" && value !== null && "error" in value;
@@ -126,7 +136,7 @@ export class ApiClient {
       });
 
       if (!response.ok) {
-        await clearStoredTokens();
+        await clearSessionAfterAuthFailure();
         return false;
       }
 
@@ -135,7 +145,7 @@ export class ApiClient {
       await saveStoredTokens(payload.data.tokens);
       return true;
     } catch {
-      await clearStoredTokens();
+      await clearSessionAfterAuthFailure();
       return false;
     }
   }

@@ -12,6 +12,7 @@ import { authRoutes } from "./routes/authRoutes";
 import { memoryRoutes } from "./routes/memoryRoutes";
 import { profileRoutes } from "./routes/profileRoutes";
 import { statusRoutes } from "./routes/statusRoutes";
+import { syncRoutes } from "./routes/syncRoutes";
 import { userRoutes } from "./routes/userRoutes";
 
 initializeDatabase();
@@ -30,6 +31,7 @@ app.use("/users", userRoutes);
 app.use("/ai", aiRoutes);
 app.use("/memories", memoryRoutes);
 app.use("/profile", profileRoutes);
+app.use("/sync", syncRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
