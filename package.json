@@ -54,6 +54,7 @@
     "release:export": "expo export --platform web",
     "build:android:preview": "eas build --platform android --profile preview",
     "build:android:production": "eas build --platform android --profile production",
+    "build:android:rc:local": "node scripts/build-android-rc.js",
     "validate:device-layer": "node scripts/validate-device-layer.js",
     "validate:offline-intelligence": "node scripts/validate-offline-intelligence.js",
     "validate:medical-rag": "node scripts/validate-medical-rag.js",
@@ -68,8 +69,8 @@
     "validate:ai-insights": "node scripts/validate-ai-insights.js",
     "validate:daily-health-briefing": "node scripts/validate-daily-health-briefing.js",
     "validate:recommendation-decision": "node scripts/validate-recommendation-decision.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "private": true

@@ -50,6 +50,7 @@
           }
         }
       ],
+      "./plugins/withAndroidSharedStlLinking",
       "expo-font"
     ],
     "extra": {

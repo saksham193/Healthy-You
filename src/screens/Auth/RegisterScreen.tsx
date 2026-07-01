@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -32,6 +32,15 @@ export default function RegisterScreen({ onLogin }: RegisterScreenProps) {
 
   const handleRegister = () => {
     void register(name.trim(), email.trim(), password);
+  };
+
+  useEffect(() => {
+    clearError();
+  }, [clearError]);
+
+  const handleLogin = () => {
+    clearError();
+    onLogin();
   };
 
   return (
@@ -113,7 +122,7 @@ export default function RegisterScreen({ onLogin }: RegisterScreenProps) {
 
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Already have an account?</Text>
-          <Pressable accessibilityRole="button" onPress={onLogin}>
+          <Pressable accessibilityRole="button" onPress={handleLogin}>
             <Text style={styles.switchAction}>Sign in</Text>
           </Pressable>
         </View>

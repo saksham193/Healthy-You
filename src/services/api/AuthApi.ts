@@ -1,5 +1,5 @@
 import { clearStoredTokens, saveStoredTokens } from "../secure/TokenStorage";
-import { apiClient } from "./ApiClient";
+import { apiClient, isAuthFailureError } from "./ApiClient";
 
 const AUTH_REQUEST_TIMEOUT_MS = 12000;
 
@@ -54,7 +54,10 @@ export async function refreshSession(refreshToken: string): Promise<AuthTokens> 
     await saveStoredTokens(response.tokens);
     return response.tokens;
   } catch (error) {
-    await clearStoredTokens();
+    if (isAuthFailureError(error)) {
+      await clearStoredTokens();
+    }
+
     throw error;
   }
 }

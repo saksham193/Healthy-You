@@ -61,6 +61,8 @@ const validateProviderSelection = () => {
 const validateProviders = () => {
   contains("src/services/device/providers/AppleHealthPermissions.ts", "await import(\"react-native-health\")");
   contains("src/services/device/providers/HealthConnectPermissions.ts", "await import(\"react-native-health-connect\")");
+  contains("src/services/device/providers/HealthConnectPermissions.ts", "HEALTH_CONNECT_PROVIDER_PACKAGES");
+  contains("src/services/device/providers/HealthConnectPermissions.ts", "com.google.android.healthconnect.controller");
   contains("src/services/device/providers/AppleHealthProvider.ts", "sourcePlatform: \"ios\"");
   contains("src/services/device/providers/HealthConnectProvider.ts", "sourcePlatform: \"android\"");
   contains("src/services/device/providers/MockDeviceProvider.ts", "source: \"fallback\"");
@@ -69,6 +71,9 @@ const validateProviders = () => {
 const validateCacheAndStore = () => {
   contains("src/services/device/HealthSyncManager.ts", "source: metrics.source === \"fallback\" ? \"fallback\" : \"cache\"");
   contains("src/services/device/HealthSyncManager.ts", "isStale: true");
+  contains("src/services/device/HealthSyncManager.ts", "MAX_QUEUE_ITEMS");
+  contains("src/services/device/HealthSyncManager.ts", "getQueueKey");
+  contains("src/services/device/HealthSyncManager.ts", ".slice(-MAX_QUEUE_ITEMS)");
   contains("src/store/healthStore.ts", "deviceDataSource");
   contains("src/store/healthStore.ts", "deviceDataStale");
 };
@@ -87,9 +92,13 @@ const validateConfig = () => {
   assert(plugins.includes("expo-health-connect"), "app.json is missing expo-health-connect plugin");
   assert(plugins.includes("./plugins/withAndroidHealthConnect"), "app.json is missing Android Health Connect local plugin");
   assert(plugins.includes("./plugins/withAppleHealthKit"), "app.json is missing Apple HealthKit local plugin");
+  assert(plugins.includes("./plugins/withAndroidSharedStlLinking"), "app.json is missing Android shared STL linker plugin");
   assert(androidPermissions.includes("android.permission.health.READ_STEPS"), "app.json is missing Health Connect steps permission");
   contains("plugins/withAppleHealthKit.js", "com.apple.developer.healthkit");
   contains("plugins/withAndroidHealthConnect.js", "com.google.android.apps.healthdata");
+  contains("plugins/withAndroidHealthConnect.js", "com.google.android.healthconnect.controller");
+  contains("plugins/withAndroidSharedStlLinking.js", "CMAKE_SHARED_LINKER_FLAGS");
+  contains("plugins/withAndroidSharedStlLinking.js", "-lc++_shared");
 };
 
 validateDeviceContract();
@@ -101,4 +110,3 @@ validateConfig();
 assertNoNativeImportsOutsideProviders();
 
 console.log("Device layer validation passed.");
-

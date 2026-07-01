@@ -12,6 +12,8 @@ type ApiErrorEnvelope = {
   };
 };
 
+type RefreshResult = "refreshed" | "invalid" | "temporary-failure";
+
 type RequestOptions = {
   authenticated?: boolean;
   retryOnUnauthorized?: boolean;
@@ -32,6 +34,20 @@ async function clearSessionAfterAuthFailure(): Promise<void> {
 
 const isApiErrorEnvelope = (value: unknown): value is ApiErrorEnvelope =>
   typeof value === "object" && value !== null && "error" in value;
+
+export class ApiRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string | undefined,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+export const isAuthFailureError = (error: unknown): boolean =>
+  error instanceof ApiRequestError && (error.status === 401 || error.status === 403);
 
 export class ApiClient {
   constructor(private readonly baseUrl = API_BASE_URL) {}
@@ -104,18 +120,25 @@ export class ApiClient {
     if (response.status === 401 && options.authenticated && options.retryOnUnauthorized !== false && tokens?.refreshToken) {
       const refreshed = await this.refreshToken(tokens.refreshToken);
 
-      if (refreshed) {
+      if (refreshed === "refreshed") {
         return this.request<T>(path, init, { ...options, retryOnUnauthorized: false });
+      }
+
+      if (refreshed === "temporary-failure") {
+        throw new ApiRequestError(
+          503,
+          "session_refresh_unavailable",
+          "Session refresh is temporarily unavailable. Please try again when connection returns.",
+        );
       }
     }
 
     if (!response.ok) {
       const errorBody: unknown = await response.json().catch(() => ({}));
-      const message = isApiErrorEnvelope(errorBody)
-        ? errorBody.error?.message ?? "API request failed."
-        : "API request failed.";
+      const apiError = isApiErrorEnvelope(errorBody) ? errorBody.error : undefined;
+      const message = apiError?.message ?? "API request failed.";
 
-      throw new Error(message);
+      throw new ApiRequestError(response.status, apiError?.code, message);
     }
 
     if (response.status === 204) {
@@ -127,7 +150,7 @@ export class ApiClient {
     return payload.data;
   }
 
-  private async refreshToken(refreshToken: string): Promise<boolean> {
+  private async refreshToken(refreshToken: string): Promise<RefreshResult> {
     try {
       const response = await fetch(`${this.baseUrl}/auth/refresh-token`, {
         method: "POST",
@@ -136,17 +159,20 @@ export class ApiClient {
       });
 
       if (!response.ok) {
-        await clearSessionAfterAuthFailure();
-        return false;
+        if (response.status === 401 || response.status === 403) {
+          await clearSessionAfterAuthFailure();
+          return "invalid";
+        }
+
+        return "temporary-failure";
       }
 
       const payload = await response.json() as ApiEnvelope<{ tokens: { accessToken: string; refreshToken: string } }>;
 
       await saveStoredTokens(payload.data.tokens);
-      return true;
+      return "refreshed";
     } catch {
-      await clearSessionAfterAuthFailure();
-      return false;
+      return "temporary-failure";
     }
   }
 }

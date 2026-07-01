@@ -14,6 +14,7 @@ const CACHE_KEY = "healthy-you.device.health-cache";
 const QUEUE_KEY = "healthy-you.device.sync-queue";
 const LAST_SYNC_KEY = "healthy-you.device.last-sync";
 const MAX_RETRY_ATTEMPTS = 3;
+const MAX_QUEUE_ITEMS = 20;
 const DEFAULT_PERIODIC_INTERVAL_MS = 30 * 60 * 1000;
 
 const withCacheSource = (metrics: DeviceHealthMetrics): DeviceHealthMetrics => ({
@@ -22,6 +23,9 @@ const withCacheSource = (metrics: DeviceHealthMetrics): DeviceHealthMetrics => (
   syncStatus: "synced",
   isStale: true,
 });
+
+const getQueueKey = (window?: DeviceSyncWindow): string =>
+  window ? `${window.startTime}:${window.endTime}` : "default";
 
 export class HealthSyncManager {
   private queue: QueuedSync[] = [];
@@ -62,13 +66,18 @@ export class HealthSyncManager {
   }
 
   async queueSync(window?: DeviceSyncWindow): Promise<void> {
+    const queueKey = getQueueKey(window);
     const queuedSync: QueuedSync = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       attempts: 0,
       window,
     };
 
-    this.queue = [...(await this.loadQueue()), queuedSync];
+    const existingQueue = await this.loadQueue();
+    this.queue = [
+      ...existingQueue.filter((item) => getQueueKey(item.window) !== queueKey),
+      queuedSync,
+    ].slice(-MAX_QUEUE_ITEMS);
     offlineAnalytics.trackMemoryQueue();
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(this.queue));
   }
@@ -91,8 +100,8 @@ export class HealthSyncManager {
       }
     }
 
-    this.queue = remaining;
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(remaining));
+    this.queue = remaining.slice(-MAX_QUEUE_ITEMS);
+    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(this.queue));
     if (queue.length > 0 && remaining.length === 0) {
       offlineAnalytics.trackReconnectSuccess();
     }

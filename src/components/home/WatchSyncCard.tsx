@@ -56,7 +56,7 @@ export default function WatchSyncCard() {
           </View>
           <View style={styles.metric}>
             <Ionicons color={COLORS.danger} name="sync-outline" size={18} />
-            <Text style={styles.metricText}>{isSyncing ? "Syncing..." : `${syncTitle} · ${formatSyncTime(primaryDevice?.lastSyncedAt ?? null)}`}</Text>
+            <Text style={styles.metricText}>{isSyncing ? "Syncing..." : `${syncTitle} - ${formatSyncTime(primaryDevice?.lastSyncedAt ?? null)}`}</Text>
           </View>
         </View>
       </View>
@@ -91,6 +91,7 @@ const styles = StyleSheet.create({
   },
   metrics: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: SPACING.xl,
     marginTop: SPACING.sm,
   },
@@ -101,6 +102,7 @@ const styles = StyleSheet.create({
   },
   metricText: {
     color: COLORS.white,
+    flexShrink: 1,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.medium,
   },

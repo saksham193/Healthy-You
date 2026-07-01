@@ -1,10 +1,13 @@
 const { withAndroidManifest } = require("@expo/config-plugins");
 
-const HEALTH_CONNECT_PACKAGE = "com.google.android.apps.healthdata";
+const HEALTH_CONNECT_PACKAGES = [
+  "com.google.android.apps.healthdata",
+  "com.google.android.healthconnect.controller",
+];
 
-const hasHealthConnectQuery = (queries) =>
+const hasHealthConnectQuery = (queries, packageName) =>
   queries.some((query) =>
-    query.package?.some((item) => item.$?.["android:name"] === HEALTH_CONNECT_PACKAGE),
+    query.package?.some((item) => item.$?.["android:name"] === packageName),
   );
 
 module.exports = function withAndroidHealthConnect(config) {
@@ -15,19 +18,20 @@ module.exports = function withAndroidHealthConnect(config) {
       manifest.queries = [];
     }
 
-    if (!hasHealthConnectQuery(manifest.queries)) {
-      manifest.queries.push({
-        package: [
-          {
-            $: {
-              "android:name": HEALTH_CONNECT_PACKAGE,
+    for (const packageName of HEALTH_CONNECT_PACKAGES) {
+      if (!hasHealthConnectQuery(manifest.queries, packageName)) {
+        manifest.queries.push({
+          package: [
+            {
+              $: {
+                "android:name": packageName,
+              },
             },
-          },
-        ],
-      });
+          ],
+        });
+      }
     }
 
     return pluginConfig;
   });
 };
-

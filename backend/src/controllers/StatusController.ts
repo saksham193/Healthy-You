@@ -10,7 +10,7 @@ export class StatusController {
     response.json({
       data: {
         service: "healthy-you-backend",
-        environment: env.NODE_ENV,
+        environment: env.ENVIRONMENT,
         openAIConfigured: Boolean(env.OPENAI_API_KEY),
       },
     });

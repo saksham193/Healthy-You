@@ -21,7 +21,7 @@ type GrantedHealthConnectPermission = {
 
 type HealthConnectClient = {
   getGrantedPermissions?: () => Promise<GrantedHealthConnectPermission[]>;
-  initialize: () => Promise<boolean>;
+  initialize: (providerPackageName?: string) => Promise<boolean>;
   readRecords?: (recordType: string, options: unknown) => Promise<unknown>;
   requestPermission: (permissions: HealthConnectPermission[]) => Promise<GrantedHealthConnectPermission[]>;
 };
@@ -48,6 +48,11 @@ const capabilityByRecordType: Record<HealthConnectPermission["recordType"], Devi
   Weight: "weight",
 };
 
+const HEALTH_CONNECT_PROVIDER_PACKAGES = [
+  "com.google.android.apps.healthdata",
+  "com.google.android.healthconnect.controller",
+];
+
 const toCapability = (permission: GrantedHealthConnectPermission): DeviceMetricCapability | undefined =>
   capabilityByRecordType[permission.recordType as HealthConnectPermission["recordType"]];
 
@@ -68,11 +73,18 @@ export async function initializeHealthConnect(): Promise<boolean> {
 
   if (!client) return false;
 
-  try {
-    return await client.initialize();
-  } catch {
-    return false;
+  for (const providerPackageName of HEALTH_CONNECT_PROVIDER_PACKAGES) {
+    try {
+      if (await client.initialize(providerPackageName)) {
+        return true;
+      }
+    } catch {
+      // Try the next provider package. Android 14+ system images may expose the
+      // controller package instead of the legacy Play Store package.
+    }
   }
+
+  return false;
 }
 
 export async function requestHealthConnectPermissions(): Promise<DeviceMetricCapability[]> {

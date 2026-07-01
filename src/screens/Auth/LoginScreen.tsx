@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -31,6 +31,20 @@ export default function LoginScreen({ onForgotPassword, onRegister }: LoginScree
 
   const handleLogin = () => {
     void login(email.trim(), password);
+  };
+
+  useEffect(() => {
+    clearError();
+  }, [clearError]);
+
+  const handleForgotPassword = () => {
+    clearError();
+    onForgotPassword();
+  };
+
+  const handleRegister = () => {
+    clearError();
+    onRegister();
   };
 
   return (
@@ -94,14 +108,14 @@ export default function LoginScreen({ onForgotPassword, onRegister }: LoginScree
             <Text style={styles.primaryButtonText}>{isLoading ? "Signing in..." : "Sign In"}</Text>
           </Pressable>
 
-          <Pressable accessibilityRole="button" onPress={onForgotPassword} style={styles.textButton}>
+          <Pressable accessibilityRole="button" onPress={handleForgotPassword} style={styles.textButton}>
             <Text style={styles.textButtonText}>Forgot password?</Text>
           </Pressable>
         </CustomCard>
 
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>New to Healthy You?</Text>
-          <Pressable accessibilityRole="button" onPress={onRegister}>
+          <Pressable accessibilityRole="button" onPress={handleRegister}>
             <Text style={styles.switchAction}>Create account</Text>
           </Pressable>
         </View>

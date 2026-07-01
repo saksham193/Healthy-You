@@ -37,11 +37,22 @@ const isNetworkUnavailable = (error: unknown): boolean => {
 
   return (
     message.includes("network request failed") ||
+    message.includes("fetch failed") ||
     message.includes("failed to fetch") ||
     message.includes("timed out") ||
     message.includes("networkerror") ||
-    message.includes("could not connect")
+    message.includes("could not connect") ||
+    message.includes("unknownhostexception") ||
+    message.includes("unable to resolve host")
   );
+};
+
+const getAuthErrorMessage = (error: unknown, fallback: string): string => {
+  if (isNetworkUnavailable(error)) {
+    return "Unable to reach Healthy You services. Check your connection and try again.";
+  }
+
+  return getErrorMessage(error, fallback);
 };
 
 const setLoggedOut = {
@@ -154,7 +165,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
         loadCloudHealthSummariesInBackground();
       } catch (error) {
         set({
-          error: getErrorMessage(error, "Registration failed."),
+          error: getAuthErrorMessage(error, "Registration failed."),
           isHydrated: true,
           isLoading: false,
           loading: false,
@@ -181,7 +192,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
         loadCloudHealthSummariesInBackground();
       } catch (error) {
         set({
-          error: getErrorMessage(error, "Login failed."),
+          error: getAuthErrorMessage(error, "Login failed."),
           isHydrated: true,
           isLoading: false,
           loading: false,
