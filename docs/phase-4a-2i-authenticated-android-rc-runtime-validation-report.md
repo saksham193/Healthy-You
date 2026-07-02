@@ -2,166 +2,274 @@
 
 Date: 2026-07-02
 
-## 1. HTTPS URL tested
+## 1. Executive summary
 
-Result: Not tested.
+Result: Authenticated Android RC validation resumed and mostly passed, but beta readiness is not approved.
 
-The value provided for the real HTTPS staging backend URL is still a placeholder:
+The deployed HTTPS staging backend is healthy after the Phase 4A-2J auth stabilization. A fresh backend auth smoke passed, and the real Android release APK authenticated successfully against the Render staging backend. Fresh login, sanitized invalid-login UI, Health Connect grant/no-data handling, session persistence, authenticated offline launch, reconnect, Medibot screen open, and logout were validated on the release APK.
 
-`<PASTE_ACTUAL_RENDER_URL_HERE>`
+Remaining blockers are profile sync recovery and fresh offline/local AI response validation. After reconnect, the Profile account area continued to show `Offline changes saved` instead of returning to a fully synced profile state. A fresh Medibot offline prompt could not be submitted through ADB text injection, so generated offline/local AI behavior, memory sync, daily briefing, trends, recommendations, and preventive wellness are not fully validated.
 
-This is not a valid HTTPS URL and cannot be used for `/health`, `/status`, RC APK configuration, or authenticated Android runtime validation.
+Live OpenAI provider validation is skipped because staging reports `openAIConfigured=false`.
 
-Current repo staging value remains:
+## 2. HTTPS URL tested
 
-`https://staging-api.healthy-you.example.com`
+Result: Passed.
 
-That placeholder was already confirmed unresolved in earlier phases.
+HTTPS staging backend tested:
 
-## 2. /health result
+`https://healthy-you-staging-backend.onrender.com`
 
-Result: Not validated.
+Confirmed configuration:
 
-No `curl <actual-render-url>/health` request was run because no actual Render HTTPS URL was provided.
+- `.env.staging`: `EXPO_PUBLIC_API_BASE_URL=https://healthy-you-staging-backend.onrender.com`
+- `eas.json` preview env: `EXPO_PUBLIC_API_BASE_URL=https://healthy-you-staging-backend.onrender.com`
 
-## 3. /status result
+No local HTTP backend, placeholder staging URL, debug/dev-client APK, or release cleartext traffic was used.
 
-Result: Not validated.
+## 3. /health result
 
-No `curl <actual-render-url>/status` request was run because no actual Render HTTPS URL was provided.
+Result: Passed.
 
-Backend staging assertions remain unconfirmed:
+`GET https://healthy-you-staging-backend.onrender.com/health`
 
-- `ENVIRONMENT=staging`
-- production/staging-safe `NODE_ENV`
-- real JWT secret configuration
-- persistent database configuration
-- restricted CORS
-- accurate OpenAI readiness reporting
+Observed:
 
-## 4. APK artifact tested
+- `status=ok`
+- `timestamp=2026-07-02T11:42:53.204Z`
 
-Result: Not tested.
+## 4. /status result
 
-No RC APK was rebuilt or installed. Rebuilding against a placeholder URL would not validate authenticated runtime.
+Result: Passed with OpenAI unavailable.
 
-## 5. Auth result
+`GET https://healthy-you-staging-backend.onrender.com/status`
 
-Result: Not validated.
+Observed:
 
-Blocked checks:
+- `service=healthy-you-backend`
+- `environment=staging`
+- `openAIConfigured=false`
 
-- Register
-- Login
-- Logout
-- Invalid credentials
-- Refresh behavior
+Live OpenAI provider validation is not validated/skipped for this RC pass.
 
-## 6. Session persistence result
+## 5. Auth backend smoke result
 
-Result: Not validated.
+Result: Passed.
 
-Force-close/reopen with an authenticated session remains blocked until a real HTTPS staging backend URL is available and embedded in the RC APK.
+Fresh staging backend smoke after deployment:
 
-## 7. Offline authenticated result
+- `/auth/register`: `201`
+- `/auth/login`: `200`
+- Invalid `/auth/login`: `401`
+- Smoke account: `phase4a2i-report-1782992573820@example.com`
 
-Result: Not validated.
+No auth response bodies or tokens were logged in the report output.
 
-Blocked checks:
+## 6. APK artifact tested
 
-- Authenticated offline launch
-- Cached session restore
-- Reconnect recovery
-- Queued sync flush
+Result: Passed.
 
-## 8. Cloud sync result
+Artifact:
 
-Result: Not validated.
+`android/app/build/outputs/apk/release/app-release.apk`
 
-Blocked checks:
+SHA-256:
 
-- Profile sync
-- Memory sync
-- Health summary sync
-- Deduplication
-- Retry behavior
+`36922E1093DBF1D0BFE541E8797BAFA5DFFCBCD79619DCEE9931EE05AA4855E6`
 
-## 9. AI runtime result
+Installed package:
 
-Result: Not validated.
+- Package: `com.healthyyou.app`
+- Launch activity: `com.healthyyou.app/.MainActivity`
+- Version: `1.0.0`
+- Version code: `1`
 
-Blocked checks:
+No rebuild was required because the release APK was newer than the staging mobile config files and already targeted the Render HTTPS backend.
 
-- Medibot runtime
-- Daily briefing
-- Trends
-- Recommendations
-- Preventive wellness
-- Personalized/account-context behavior
+## 7. Auth runtime result
 
-OpenAI readiness cannot be confirmed until `/status` is reachable over the real HTTPS staging backend.
+Result: Passed.
 
-## 10. Health Connect result
+Validated on the real release APK:
 
-Result: Not validated.
+- Fresh authenticated login succeeded with `phase4a2i-ui-1782991729774@example.com`.
+- Invalid credentials remained sanitized in the UI: `Email or password is incorrect.`
+- Logout was reached from the authenticated Profile account section.
+- Logout confirmation dialog appeared.
+- Confirmed logout returned to the Login screen.
 
-Blocked checks:
+## 8. Session persistence result
 
-- Availability detection
-- Permission flow
-- Full, partial, and denied permission behavior
-- Manual sync
-- No-data, cached, live, and sync-error states
+Result: Passed.
 
-## 11. Bugs found
+After successful login, force-stop and reopen restored the authenticated Dashboard instead of returning to Login.
 
-No authenticated runtime bugs were found because authenticated runtime validation could not start.
+Evidence:
 
-Blocking configuration issue:
+- `phase4a_2i_session_persistence_pass.xml`
+- `phase4a_2i_session_persistence_pass.png`
 
-- The requested real HTTPS staging backend URL is still a placeholder: `<PASTE_ACTUAL_RENDER_URL_HERE>`.
+## 9. Offline authenticated result
 
-## 12. Fixes implemented
+Result: Passed.
 
-No runtime fixes were implemented.
+With airplane mode enabled and Wi-Fi/mobile data disabled, force-stop and reopen still restored the authenticated Dashboard. This validates cached authenticated launch behavior for the release APK.
 
-No changes were made to:
+Reconnect recovery partially passed: after airplane mode was disabled and Wi-Fi/mobile data were restored, the app stayed authenticated and navigation remained usable. Profile sync recovery did not fully clear, as noted in the Cloud sync and Bugs sections.
 
-- `.env.staging`
-- `eas.json`
-- Android manifest or network security
-- Backend architecture
-- AI architecture
-- APK artifacts
+Evidence:
 
-## 13. Remaining blockers
+- `phase4a_2i_offline_authenticated_launch.xml`
+- `phase4a_2i_offline_authenticated_launch.png`
 
-Remaining blocker:
+## 10. Cloud sync result
 
-- A real reachable Render HTTPS backend URL is still required.
+Result: Partial, not beta-ready.
 
-Required before validation can proceed:
+Passed observations:
 
-- Provide the actual deployed URL, for example `https://healthy-you-staging-backend.onrender.com`.
-- Verify `/health` and `/status` over HTTPS.
-- Confirm `/status` reports staging correctly.
-- Update `.env.staging` and `eas.json` with the verified URL.
-- Rebuild the real release/RC APK.
-- Install the APK and rerun authenticated runtime validation.
+- Authenticated Profile opened after reconnect.
+- Health profile and summary data rendered.
+- Health Connect no-data state appeared as `Synced no_data`.
+- Health backup showed `Synced`.
 
-## 14. Beta readiness assessment
+Not fully validated or blocked:
+
+- Profile account sync remained `Offline changes saved` after reconnect and a wait period.
+- Memory sync was not validated because a fresh Medibot offline message could not be submitted.
+- Manual account sync was not clearly exposed in the validated Account section.
+
+Evidence:
+
+- `phase4a_2i_profile_reconnected.xml`
+- `phase4a_2i_profile_account_reconnected.xml`
+- `phase4a_2i_profile_account_after_reconnect_wait.xml`
+
+## 11. AI runtime result
+
+Result: Partial, not beta-ready.
+
+Passed observations:
+
+- Medibot screen opened while offline.
+- Medibot reported offline status.
+- Existing seeded/cached conversation content rendered.
+
+Not validated:
+
+- Fresh offline/local AI generated response.
+- Memory sync.
+- Daily briefing generation.
+- Trends generation.
+- Recommendations generation.
+- Preventive wellness generation.
+- Live OpenAI provider behavior.
+
+Reason: staging reports `openAIConfigured=false`, so live OpenAI validation is skipped. Fresh offline/local AI generation was attempted, but ADB text injection did not populate the Medibot input reliably enough to submit a new prompt. Existing seeded conversation content is not counted as proof of generated offline/local AI response.
+
+Evidence:
+
+- `phase4a_2i_medibot_offline_open.xml`
+- `phase4a_2i_medibot_offline_open.png`
+- `phase4a_2i_medibot_offline_response.xml`
+- `phase4a_2i_medibot_offline_response2.xml`
+
+## 12. Health Connect result
+
+Result: Passed for granted/no-data state.
+
+Validated:
+
+- Health Connect permission sheet opened from the release APK.
+- Full requested read permissions were granted.
+- App returned to Healthy You after the permission flow.
+- Profile/health state showed granted/no-data handling with `Synced no_data`.
+
+Manual sync, if exposed outside the validated Account section, was not separately validated.
+
+Evidence:
+
+- `phase4a_2i_hc_allow_all.xml`
+- `phase4a_2i_after_hc_return.png`
+- `phase4a_2i_profile_reconnected.xml`
+
+## 13. UI/navigation result
+
+Result: Passed with AI input limitation.
+
+Validated navigation:
+
+- Login screen.
+- Invalid-login sanitized error state.
+- Authenticated Dashboard.
+- Health Connect permission flow and return to app.
+- Profile screen.
+- Profile Account section.
+- Medibot screen.
+- Logout confirmation and return to Login.
+
+No UI crash, ANR, or repeated app restart loop was observed. The only UI limitation in this pass was automated Medibot prompt entry through ADB.
+
+## 14. Bugs found
+
+1. Profile sync does not fully recover after reconnect.
+   - After offline launch and reconnect, the Profile Account section still showed `Offline changes saved`.
+   - Health backup separately showed `Synced`.
+   - This should be treated as a beta blocker until the queued profile state flushes or the UI explains the pending state correctly.
+
+2. Fresh offline/local AI response could not be validated through the current runtime automation path.
+   - Medibot opened offline and showed offline status.
+   - ADB text injection did not reliably populate the chat input, so a new prompt could not be submitted.
+   - Existing seeded/cached conversation content is not sufficient evidence for generated offline/local AI.
+
+## 15. Fixes implemented
+
+No app, backend, Android network-security, or AI runtime fixes were implemented during this validation pass.
+
+Documentation was updated to replace the stale backend-auth-blocked report with the post-stabilization RC runtime results.
+
+## 16. Security/logging observations
+
+Logcat scan after the authenticated release APK pass:
+
+- JWT-like token matches: `0`
+- Bearer header matches: `0`
+- Access-token text matches: `0`
+- Refresh-token text matches: `0`
+- Raw health-history matches: `0`
+- App fatal exceptions: `0`
+- App ANRs: `0`
+- React Native JS error/network failure lines: `0`
+
+No JWT, access token, refresh token, Bearer authorization header, or raw health-history leakage was observed in logcat.
+
+## 17. Remaining blockers
+
+Blocking for beta:
+
+- Profile sync recovery after reconnect remains unresolved because the Account section continued to show `Offline changes saved`.
+- Fresh offline/local AI response generation is not validated.
+- Memory sync, daily briefing, trends, recommendations, and preventive wellness remain not fully validated because fresh Medibot prompt submission did not complete.
+
+Explicitly skipped:
+
+- Live OpenAI provider validation, because `/status` reports `openAIConfigured=false`.
+
+## 18. Beta readiness assessment
 
 Not beta-ready.
 
-Authenticated Android RC runtime has not been validated against a real HTTPS staging backend.
+The backend auth stabilization is verified, the release APK is correctly pointed at HTTPS staging, and the core authenticated runtime path is significantly healthier than the previous blocked pass. However, beta readiness should not be claimed until profile sync recovery and fresh offline/local AI behavior pass on the release APK.
 
-## 15. Recommended next step
+## 19. Recommended next step
 
-Provide the actual Render HTTPS service URL, then rerun Phase 4A-2I starting with:
+Fix or instrument the profile sync recovery path first, then rerun a narrow release-APK validation focused on:
 
-```bash
-curl https://<actual-render-url>/health
-curl https://<actual-render-url>/status
-```
+- Offline launch.
+- Reconnect.
+- Profile sync flush.
+- Memory sync.
+- Fresh offline/local Medibot response.
+- Daily briefing, trends, recommendations, and preventive wellness.
 
-Only after both endpoints pass should `.env.staging`, `eas.json`, and the RC APK be updated.
+Keep live OpenAI provider validation marked skipped until staging reports `openAIConfigured=true`.

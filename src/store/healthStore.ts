@@ -76,8 +76,14 @@ const ensureProfileConnectivityFlush = (): void => {
 
   profileConnectivityFlushStarted = true;
   connectivityService.subscribe((status) => {
-    if (status.isOnline && useHealthStore.getState().queuedProfileUpdateCount > 0) {
-      void useHealthStore.getState().flushQueuedProfileUpdates();
+    if (status.isOnline) {
+      const state = useHealthStore.getState();
+
+      if (state.queuedProfileUpdateCount > 0) {
+        void state.flushQueuedProfileUpdates();
+      } else if (state.profileSyncStatus === "offline" || state.profileSyncStatus === "pending") {
+        void state.loadProfileFromCloud();
+      }
     }
 
     if (status.isOnline && useHealthStore.getState().queuedHealthSummaryBackupCount > 0) {

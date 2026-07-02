@@ -25,7 +25,7 @@
       },
       "env": {
         "EXPO_PUBLIC_ENVIRONMENT": "staging",
-        "EXPO_PUBLIC_API_BASE_URL": "https://staging-api.healthy-you.example.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://healthy-you-staging-backend.onrender.com"
       }
     },
     "production": {
