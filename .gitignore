@@ -62,3 +62,8 @@ backend/.env*
 # generated native folders
 /ios
 /android
+
+# Runtime validation artifacts
+phase4a_*.png
+phase4a_*.xml
+phase4a_*.txt
