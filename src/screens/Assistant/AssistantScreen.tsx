@@ -122,7 +122,18 @@ export default function AssistantScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.container}
       >
-        <AppHeader title="Medibot AI" subtitle="Your Personal Health Assistant">
+        <AppHeader
+          subtitle="Your Personal Health Assistant"
+          theme={{
+            actionBackgroundColor: "rgba(5, 45, 78, 0.10)",
+            backgroundColor: COLORS.brandAqua,
+            foregroundColor: COLORS.purpleInk,
+            glowAccentColor: COLORS.brandDeepBlue,
+            glowColor: COLORS.brandCyan,
+            subtitleColor: COLORS.purpleInk,
+          }}
+          title="Medibot"
+        >
           <CustomCard style={styles.statusCard}>
             <View style={styles.botIcon}>
               <AnimatedMedibot
@@ -132,7 +143,7 @@ export default function AssistantScreen() {
               />
             </View>
             <View style={styles.statusCopy}>
-              <Text style={styles.statusTitle}>AI status</Text>
+              <Text style={styles.statusTitle}>Medibot status</Text>
               <View style={styles.statusRow}>
                 <View style={[styles.pulseDot, isOffline && styles.offlineDot]} />
                 <Text style={styles.statusText}>{isOffline ? "Offline" : "Online"}</Text>
@@ -159,6 +170,7 @@ export default function AssistantScreen() {
               <CustomCard style={styles.emptyCard}>
                 <EmptyState
                   icon="chatbubble-ellipses-outline"
+                  loading={assistantLoading}
                   subtitle="Your recent Medibot conversations will appear here."
                   title="No conversation history"
                 />
@@ -178,6 +190,7 @@ export default function AssistantScreen() {
               <CustomCard style={styles.welcomeCard}>
                 <EmptyState
                   icon={error ? "alert-circle-outline" : "sparkles-outline"}
+                  loading={!error && assistantLoading}
                   subtitle={
                     error ??
                     (assistantLoading
@@ -200,6 +213,7 @@ export default function AssistantScreen() {
               <CustomCard style={styles.emptyCard}>
                 <EmptyState
                   icon="sparkles-outline"
+                  loading={assistantLoading}
                   subtitle="Prompt ideas will appear when assistant data is ready."
                   title="No suggested prompts"
                 />
@@ -231,6 +245,7 @@ export default function AssistantScreen() {
                 <CustomCard style={styles.emptyActionCard}>
                   <EmptyState
                     icon="flash-outline"
+                    loading={assistantLoading}
                     subtitle="Assistant shortcuts will appear here."
                     title="No quick actions"
                   />

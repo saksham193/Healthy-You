@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
 import { useDevices } from "../../hooks/useDevices";
-import { COLORS } from "../../theme/colors";
+import { COLORS, FITNESS_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { ConnectedHealthDevice } from "../../types";
@@ -54,7 +54,7 @@ export default function WatchSyncStatusCard({
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <View style={styles.iconWrap}>
-            <Ionicons color={COLORS.primary} name={activeDevice.iconName} size={22} />
+            <Ionicons color={FITNESS_COLORS.primary} name={activeDevice.iconName} size={22} />
           </View>
           <View>
             <Text style={styles.title}>Device Sync Active</Text>
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: FITNESS_COLORS.light,
     borderRadius: SPACING.lg,
     height: SPACING.xxxl + SPACING.md,
     justifyContent: "center",

@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
-import { COLORS } from "../../theme/colors";
+import { COLORS, FITNESS_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { FitnessSummary, ProfileData } from "../../types";
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   },
   timerButton: {
     alignItems: "center",
-    backgroundColor: COLORS.primary,
+    backgroundColor: FITNESS_COLORS.primary,
     borderRadius: SPACING.lg,
     flexDirection: "row",
     gap: SPACING.sm,

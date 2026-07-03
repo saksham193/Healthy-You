@@ -5,7 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getScheduleToneColors } from "../../utils/tone";
 import type { MedicationReminder, MedicationStatus, Tone } from "../../types";
 
 type MedicationReminderCardProps = {
@@ -18,7 +18,7 @@ const statusTone: Record<MedicationStatus, Tone> = {
 };
 
 export default function MedicationReminderCard({ medication }: MedicationReminderCardProps) {
-  const tone = getToneColors(statusTone[medication.status]);
+  const tone = getScheduleToneColors(statusTone[medication.status]);
   const isCompleted = medication.status === "completed";
 
   return (

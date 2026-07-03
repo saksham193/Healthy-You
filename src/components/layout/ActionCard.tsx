@@ -5,7 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getToneColors, type ToneColors } from "../../utils/tone";
 import type { IconName, Tone } from "../../types";
 
 type ActionCardProps = {
@@ -13,10 +13,17 @@ type ActionCardProps = {
   iconName: IconName;
   tone: Tone;
   onPress?: () => void;
+  toneColorsOverride?: ToneColors;
 };
 
-export default function ActionCard({ title, iconName, tone, onPress }: ActionCardProps) {
-  const toneColors = getToneColors(tone);
+export default function ActionCard({
+  title,
+  iconName,
+  tone,
+  onPress,
+  toneColorsOverride,
+}: ActionCardProps) {
+  const toneColors = toneColorsOverride ?? getToneColors(tone);
 
   return (
     <TouchableOpacity

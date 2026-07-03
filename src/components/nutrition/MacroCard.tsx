@@ -5,7 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getNutritionMacroToneColors } from "../../utils/tone";
 import type { MacroNutrient } from "../../types";
 
 type MacroCardProps = {
@@ -13,7 +13,7 @@ type MacroCardProps = {
 };
 
 export default function MacroCard({ macro }: MacroCardProps) {
-  const tone = getToneColors(macro.tone);
+  const tone = getNutritionMacroToneColors(macro.id, macro.tone);
 
   return (
     <CustomCard style={styles.card}>

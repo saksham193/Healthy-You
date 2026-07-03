@@ -11,6 +11,8 @@ type ActivityChartProps = {
   labels: string[];
   values: number[];
   mode?: "line" | "dot";
+  accentColor?: string;
+  trackColor?: string;
 };
 
 export default function ActivityChart({
@@ -19,6 +21,8 @@ export default function ActivityChart({
   labels,
   values,
   mode = "line",
+  accentColor = COLORS.primary,
+  trackColor = COLORS.primaryLight,
 }: ActivityChartProps) {
   const max = Math.max(...values, 1);
 
@@ -32,10 +36,11 @@ export default function ActivityChart({
           return (
             <View key={`${labels[index]}-${index}`} style={styles.column}>
               <View style={styles.plotArea}>
-                {mode === "line" ? <View style={[styles.line, { height }]} /> : null}
+                {mode === "line" ? <View style={[styles.line, { backgroundColor: trackColor, height }]} /> : null}
                 <View
                   style={[
                     styles.dot,
+                    { borderColor: accentColor },
                     mode === "dot" && {
                       bottom: height,
                     },
@@ -84,13 +89,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   line: {
-    backgroundColor: COLORS.primaryLight,
     borderRadius: 999,
     width: 3,
   },
   dot: {
     backgroundColor: COLORS.white,
-    borderColor: COLORS.primary,
     borderRadius: 7,
     borderWidth: 3,
     height: 14,

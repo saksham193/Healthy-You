@@ -10,7 +10,13 @@ import FitnessScreen from "../screens/Fitness/FitnessScreen";
 import ScheduleScreen from "../screens/Schedule/ScheduleScreen";
 import AssistantScreen from "../screens/Assistant/AssistantScreen";
 import ProfileScreen from "../screens/Profile/ProfileScreen";
-import { COLORS } from "../theme/colors";
+import {
+  COLORS,
+  DATA_COLORS,
+  FITNESS_COLORS,
+  NUTRITION_COLORS,
+  SCHEDULE_COLORS,
+} from "../theme/colors";
 import { TYPOGRAPHY } from "../theme/typography";
 import type { IconName, RootTabParamList } from "../types";
 
@@ -26,11 +32,45 @@ const tabIcons: Record<keyof RootTabParamList, IconName> = {
   Profile: "person-circle-outline",
 };
 
+const activeTabColors: Record<keyof RootTabParamList, { foreground: string; background: string }> = {
+  Chat: {
+    foreground: COLORS.primaryDark,
+    background: COLORS.primaryLight,
+  },
+  Nutrition: {
+    foreground: NUTRITION_COLORS.dark,
+    background: NUTRITION_COLORS.light,
+  },
+  Fitness: {
+    foreground: FITNESS_COLORS.primary,
+    background: FITNESS_COLORS.light,
+  },
+  Data: {
+    foreground: DATA_COLORS.ink,
+    background: DATA_COLORS.light,
+  },
+  Schedule: {
+    foreground: SCHEDULE_COLORS.dark,
+    background: SCHEDULE_COLORS.light,
+  },
+  Profile: {
+    foreground: COLORS.primaryDark,
+    background: COLORS.primaryLight,
+  },
+};
+
 function TabIcon({ focused, name }: { focused: boolean; name: keyof RootTabParamList }) {
+  const activeColors = activeTabColors[name];
+
   return (
-    <View style={[styles.icon, focused && styles.iconActive]}>
+    <View
+      style={[
+        styles.icon,
+        focused && { backgroundColor: activeColors.background },
+      ]}
+    >
       <Ionicons
-        color={focused ? COLORS.primary : COLORS.textMuted}
+        color={focused ? activeColors.foreground : COLORS.textMuted}
         name={tabIcons[name]}
         size={22}
       />
@@ -56,7 +96,7 @@ export default function BottomTabs() {
           initialRouteName="Data"
           screenOptions={({ route }) => ({
             headerShown: false,
-            tabBarActiveTintColor: COLORS.primary,
+            tabBarActiveTintColor: activeTabColors[route.name].foreground,
             tabBarInactiveTintColor: COLORS.textMuted,
             tabBarLabelStyle: styles.label,
             tabBarStyle: styles.tabBar,
@@ -110,8 +150,5 @@ const styles = StyleSheet.create({
     height: 30,
     justifyContent: "center",
     width: 38,
-  },
-  iconActive: {
-    backgroundColor: COLORS.primaryLight,
   },
 });

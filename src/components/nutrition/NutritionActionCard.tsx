@@ -1,5 +1,6 @@
 import React from "react";
 import ActionCard from "../layout/ActionCard";
+import { getNutritionToneColors } from "../../utils/tone";
 import type { NutritionAction } from "../../types";
 
 type NutritionActionCardProps = {
@@ -14,6 +15,7 @@ export default function NutritionActionCard({ action, onPress }: NutritionAction
       onPress={onPress}
       title={action.title}
       tone={action.tone}
+      toneColorsOverride={getNutritionToneColors(action.tone)}
     />
   );
 }

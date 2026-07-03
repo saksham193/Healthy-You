@@ -7,9 +7,19 @@ type ProgressRingProps = {
   value: number;
   max: number;
   size?: number;
+  color?: string;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
-export default function ProgressRing({ value, max, size = 88 }: ProgressRingProps) {
+export default function ProgressRing({
+  value,
+  max,
+  size = 88,
+  color = COLORS.accent,
+  backgroundColor = COLORS.accentLight,
+  textColor,
+}: ProgressRingProps) {
   const percent = Math.min(100, Math.round((value / max) * 100));
   const borderWidth = Math.max(6, Math.round(size * 0.09));
 
@@ -20,12 +30,14 @@ export default function ProgressRing({ value, max, size = 88 }: ProgressRingProp
         {
           borderWidth,
           borderRadius: size / 2,
+          backgroundColor,
+          borderColor: color,
           height: size,
           width: size,
         },
       ]}
     >
-      <Text style={styles.value}>{percent}%</Text>
+      <Text style={[styles.value, { color: textColor ?? color }]}>{percent}%</Text>
     </View>
   );
 }
@@ -33,12 +45,9 @@ export default function ProgressRing({ value, max, size = 88 }: ProgressRingProp
 const styles = StyleSheet.create({
   ring: {
     alignItems: "center",
-    backgroundColor: COLORS.accentLight,
-    borderColor: COLORS.accent,
     justifyContent: "center",
   },
   value: {
-    color: COLORS.accent,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.heavy,
   },

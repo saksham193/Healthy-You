@@ -11,8 +11,9 @@ import ScreenSheet from "../../components/layout/ScreenSheet";
 import StatsCard from "../../components/layout/StatsCard";
 import EmptyState from "../../components/layout/EmptyState";
 import { useHealthData } from "../../hooks/useHealthData";
-import { COLORS } from "../../theme/colors";
+import { COLORS, DATA_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
+import { getDataToneColors, getHomeFeatureToneColors } from "../../utils/tone";
 import type { RootTabParamList } from "../../types";
 
 type HomeScreenProps = BottomTabScreenProps<RootTabParamList, "Data">;
@@ -45,10 +46,24 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     return (
       <ScreenContainer>
         <View style={styles.shell}>
-          <AppHeader title="Your Health Overview" showSearch />
+          <AppHeader
+            showSearch
+            theme={{
+              actionBackgroundColor: "rgba(113, 63, 18, 0.10)",
+              backgroundColor: DATA_COLORS.primary,
+              foregroundColor: DATA_COLORS.ink,
+              glowAccentColor: DATA_COLORS.secondary,
+              glowColor: DATA_COLORS.light,
+              subtitleColor: DATA_COLORS.ink,
+            }}
+            title="Your Health Overview"
+          />
           <ScreenSheet>
             <EmptyState
+              accentColor={DATA_COLORS.dark}
+              backgroundColor={DATA_COLORS.light}
               icon={error ? "alert-circle-outline" : "pulse-outline"}
+              loading={!error && loading}
               subtitle={error ?? (loading ? "Loading your health dashboard." : "Health dashboard data is unavailable.")}
               title={error ? "Unable to load dashboard" : "Preparing dashboard"}
             />
@@ -61,7 +76,18 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   return (
     <ScreenContainer>
       <View style={styles.shell}>
-        <AppHeader title="Your Health Overview" showSearch />
+        <AppHeader
+          showSearch
+          theme={{
+            actionBackgroundColor: "rgba(113, 63, 18, 0.10)",
+            backgroundColor: DATA_COLORS.primary,
+            foregroundColor: DATA_COLORS.ink,
+            glowAccentColor: DATA_COLORS.secondary,
+            glowColor: DATA_COLORS.light,
+            subtitleColor: DATA_COLORS.ink,
+          }}
+          title="Your Health Overview"
+        />
 
         <ScreenSheet>
           <DashboardSection title="Daily Activity Summary" actionLabel="See All" />
@@ -71,6 +97,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               <StatsCard
                 icon={summary.iconName}
                 key={summary.id}
+                style={styles.summaryCard}
                 subtitle={summary.suffix}
                 title={summary.title}
                 tone={summary.tone}
@@ -79,9 +106,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             ))}
             <StatsCard
               icon="pulse-outline"
+              style={styles.summaryCard}
               subtitle={healthScore.status}
               title="Health Score"
               tone="accent"
+              toneColorsOverride={getDataToneColors("accent")}
               value={`${healthScore.score}`}
             />
           </View>
@@ -89,17 +118,26 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           <DashboardSection title="Health Dashboard" actionLabel="See All" />
           <ActivityChart
             labels={vitals.labels}
+            accentColor={DATA_COLORS.dark}
             subtitle="Systolic / Diastolic"
             title="Blood Pressure"
+            trackColor={DATA_COLORS.light}
             values={vitals.bloodPressurePoints}
           />
 
           <DashboardSection title="Blood Glucose Levels" actionLabel="See All" />
-          <ActivityChart labels={vitals.labels} mode="dot" values={vitals.glucosePoints} />
+          <ActivityChart
+            accentColor={DATA_COLORS.dark}
+            labels={vitals.labels}
+            mode="dot"
+            trackColor={DATA_COLORS.light}
+            values={vitals.glucosePoints}
+          />
 
           <View style={styles.summaryGrid}>
             <StatsCard
               icon="moon-outline"
+              style={styles.summaryCard}
               subtitle="Rest Duration"
               title="Sleep Record"
               tone="warning"
@@ -107,9 +145,10 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             />
             <StatsCard
               icon="analytics-outline"
+              style={styles.summaryCard}
               subtitle="Quality"
               title="Sleep Quality"
-              tone="accent"
+              tone="warning"
               value="31%"
             />
           </View>
@@ -121,6 +160,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                 feature={feature}
                 key={feature.id}
                 onPress={() => handleFeaturePress(feature.id)}
+                toneColorsOverride={getHomeFeatureToneColors(feature.id, feature.tone)}
               />
             ))}
           </View>
@@ -142,6 +182,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: SPACING.md,
     marginTop: SPACING.md,
+  },
+  summaryCard: {
+    flexBasis: "47%",
+    minWidth: 150,
   },
   featureGrid: {
     flexDirection: "row",

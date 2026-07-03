@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../../theme/colors";
+import { COLORS, DATA_COLORS, NUTRITION_COLORS } from "../../theme/colors";
 import { SHADOWS } from "../../theme/shadows";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
@@ -42,20 +42,26 @@ export default function WatchSyncCard() {
       <View
         style={[
           styles.statusDot,
-          { backgroundColor: isConnected ? COLORS.success : COLORS.textMuted },
+          { backgroundColor: isConnected ? NUTRITION_COLORS.light : COLORS.surfaceMuted },
         ]}
-      />
+      >
+        <Ionicons
+          color={isConnected ? NUTRITION_COLORS.dark : COLORS.textMuted}
+          name={isConnected ? "checkmark-outline" : "remove-outline"}
+          size={17}
+        />
+      </View>
       <View style={styles.content}>
         <Text style={styles.title}>
           {isConnected ? "Device Sync Active" : "Device Sync Inactive"}
         </Text>
         <View style={styles.metrics}>
           <View style={styles.metric}>
-            <Ionicons color={COLORS.danger} name={primaryDevice?.iconName ?? "watch-outline"} size={19} />
+            <Ionicons color={COLORS.primaryDark} name={primaryDevice?.iconName ?? "watch-outline"} size={19} />
             <Text style={styles.metricText}>{syncStatusLabel}</Text>
           </View>
           <View style={styles.metric}>
-            <Ionicons color={COLORS.danger} name="sync-outline" size={18} />
+            <Ionicons color={DATA_COLORS.dark} name="sync-outline" size={18} />
             <Text style={styles.metricText}>{isSyncing ? "Syncing..." : `${syncTitle} - ${formatSyncTime(primaryDevice?.lastSyncedAt ?? null)}`}</Text>
           </View>
         </View>
@@ -67,7 +73,9 @@ export default function WatchSyncCard() {
 const styles = StyleSheet.create({
   card: {
     alignItems: "center",
-    backgroundColor: COLORS.purpleInk,
+    backgroundColor: COLORS.white,
+    borderColor: DATA_COLORS.light,
+    borderWidth: 1,
     borderRadius: 18,
     flexDirection: "row",
     marginTop: SPACING.xl,
@@ -75,9 +83,10 @@ const styles = StyleSheet.create({
     ...SHADOWS.medium,
   },
   statusDot: {
-    backgroundColor: COLORS.success,
+    alignItems: "center",
     borderRadius: 14,
     height: 28,
+    justifyContent: "center",
     marginRight: SPACING.md,
     width: 28,
   },
@@ -85,7 +94,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.bold,
   },
@@ -101,7 +110,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   metricText: {
-    color: COLORS.white,
+    color: COLORS.textMuted,
     flexShrink: 1,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.medium,

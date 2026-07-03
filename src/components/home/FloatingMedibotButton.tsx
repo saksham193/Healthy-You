@@ -27,7 +27,7 @@ export default function FloatingMedibotButton({ onPress, state = "idle" }: Float
           state={state}
         />
       </View>
-      <Text style={styles.label}>AI</Text>
+      <Text numberOfLines={1} style={styles.label}>Medibot</Text>
     </TouchableOpacity>
   );
 }
@@ -37,14 +37,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.primary,
     borderColor: COLORS.secondary,
-    borderRadius: 42,
+    borderRadius: 44,
     borderWidth: 4,
     bottom: 86,
-    height: 84,
+    height: 88,
     justifyContent: "center",
     position: "absolute",
     right: SPACING.xl,
-    width: 84,
+    width: 88,
     zIndex: 20,
     ...SHADOWS.medium,
   },
@@ -57,8 +57,9 @@ const styles = StyleSheet.create({
   },
   label: {
     color: COLORS.white,
-    fontSize: TYPOGRAPHY.sizes.xs,
+    fontSize: 11,
     fontWeight: TYPOGRAPHY.weights.heavy,
-    marginTop: -SPACING.xs,
+    marginTop: -SPACING.xs / 2,
+    textAlign: "center",
   },
 });

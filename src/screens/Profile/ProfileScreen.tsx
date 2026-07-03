@@ -54,11 +54,23 @@ export default function ProfileScreen() {
   if (!profile || !healthScore) {
     return (
       <ScreenContainer>
-        <AppHeader title="Health Profile" subtitle="Your personal health identity center" />
+        <AppHeader
+          subtitle="Your personal health identity center"
+          theme={{
+            actionBackgroundColor: "rgba(5, 45, 78, 0.10)",
+            backgroundColor: COLORS.brandAqua,
+            foregroundColor: COLORS.purpleInk,
+            glowAccentColor: COLORS.brandDeepBlue,
+            glowColor: COLORS.brandCyan,
+            subtitleColor: COLORS.purpleInk,
+          }}
+          title="Health Profile"
+        />
         <ScreenSheet>
           <CustomCard style={styles.scoreCard}>
             <EmptyState
               icon={error ? "alert-circle-outline" : "person-outline"}
+              loading={!error && loading}
               subtitle={error ?? (loading ? "Loading your profile." : "Profile data is unavailable.")}
               title={error ? "Unable to load profile" : "Preparing profile"}
             />
@@ -96,13 +108,30 @@ export default function ProfileScreen() {
 
   return (
     <ScreenContainer>
-      <AppHeader title="Health Profile" subtitle="Your personal health identity center">
+      <AppHeader
+        subtitle="Your personal health identity center"
+        theme={{
+          actionBackgroundColor: "rgba(5, 45, 78, 0.10)",
+          backgroundColor: COLORS.brandAqua,
+          foregroundColor: COLORS.purpleInk,
+          glowAccentColor: COLORS.brandDeepBlue,
+          glowColor: COLORS.brandCyan,
+          subtitleColor: COLORS.purpleInk,
+        }}
+        title="Health Profile"
+      >
         <ProfileHeaderCard onEditPress={handleEditProfile} profile={profileSummary} />
       </AppHeader>
 
       <ScreenSheet>
         <CustomCard style={styles.scoreCard}>
-          <ProgressRing max={100} size={118} value={healthScore.score} />
+          <ProgressRing
+            backgroundColor={COLORS.brandSoftBlue}
+            color={COLORS.brandDeepBlue}
+            max={100}
+            size={118}
+            value={healthScore.score}
+          />
           <View style={styles.scoreCopy}>
             <Text style={styles.scoreLabel}>Overall Health Score</Text>
             <Text style={styles.scoreValue}>{healthScore.score} / 100</Text>
@@ -178,6 +207,7 @@ export default function ProfileScreen() {
           <CustomCard style={styles.emptyCard}>
             <EmptyState
               icon={devices.error ? "alert-circle-outline" : "fitness-outline"}
+              loading={!devices.error && devices.loading}
               subtitle={
                 devices.error ??
                 (devices.loading
@@ -217,14 +247,20 @@ export default function ProfileScreen() {
           <View style={styles.accountCopy}>
             <Text style={styles.accountName}>{authUser?.name ?? profile.summary.name}</Text>
             <Text style={styles.accountEmail}>{authUser?.email ?? "Signed in on this device"}</Text>
-            <Text style={styles.syncStatus}>
-              {profileSyncLabel}
-              {data.queuedProfileUpdateCount > 0 ? ` (${data.queuedProfileUpdateCount})` : ""}
-            </Text>
-            <Text style={styles.syncStatus}>
-              {healthBackupLabel}
-              {data.queuedHealthSummaryBackupCount > 0 ? ` (${data.queuedHealthSummaryBackupCount})` : ""}
-            </Text>
+            <View style={styles.syncStatusList}>
+              <View style={styles.syncStatusPill}>
+                <Text style={styles.syncStatus}>
+                  {profileSyncLabel}
+                  {data.queuedProfileUpdateCount > 0 ? ` (${data.queuedProfileUpdateCount})` : ""}
+                </Text>
+              </View>
+              <View style={styles.syncStatusPill}>
+                <Text style={styles.syncStatus}>
+                  {healthBackupLabel}
+                  {data.queuedHealthSummaryBackupCount > 0 ? ` (${data.queuedHealthSummaryBackupCount})` : ""}
+                </Text>
+              </View>
+            </View>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -292,13 +328,13 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   statusChip: {
-    backgroundColor: COLORS.accentLight,
+    backgroundColor: COLORS.primaryLight,
     borderRadius: SPACING.lg,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
   },
   statusText: {
-    color: COLORS.accent,
+    color: COLORS.primaryDark,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontWeight: TYPOGRAPHY.weights.bold,
   },
@@ -359,11 +395,21 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.sm,
     marginTop: SPACING.xs,
   },
+  syncStatusList: {
+    alignItems: "flex-start",
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+  },
+  syncStatusPill: {
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
   syncStatus: {
-    color: COLORS.textMuted,
+    color: COLORS.primaryDark,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontWeight: TYPOGRAPHY.weights.bold,
-    marginTop: SPACING.xs,
   },
   logoutButton: {
     alignItems: "center",

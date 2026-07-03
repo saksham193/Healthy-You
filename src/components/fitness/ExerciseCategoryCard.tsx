@@ -5,7 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getFitnessToneColors } from "../../utils/tone";
 import type { ExerciseCategory } from "../../types";
 
 type ExerciseCategoryCardProps = {
@@ -13,7 +13,7 @@ type ExerciseCategoryCardProps = {
 };
 
 export default function ExerciseCategoryCard({ category }: ExerciseCategoryCardProps) {
-  const tone = getToneColors(category.tone);
+  const tone = getFitnessToneColors(category.tone);
 
   return (
     <CustomCard style={styles.card}>

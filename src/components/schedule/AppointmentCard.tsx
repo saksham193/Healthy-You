@@ -5,6 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
+import { getScheduleAppointmentToneColors } from "../../utils/tone";
 import type { Appointment } from "../../types";
 
 type AppointmentCardProps = {
@@ -12,22 +13,24 @@ type AppointmentCardProps = {
 };
 
 export default function AppointmentCard({ appointment }: AppointmentCardProps) {
+  const tone = getScheduleAppointmentToneColors(appointment.id, appointment.specialty);
+
   return (
-    <CustomCard style={styles.card}>
-      <View style={styles.iconWrap}>
-        <Ionicons color={COLORS.primary} name={appointment.iconName} size={22} />
+    <CustomCard style={[styles.card, { borderLeftColor: tone.foreground }]}>
+      <View style={[styles.iconWrap, { backgroundColor: tone.background }]}>
+        <Ionicons color={tone.foreground} name={appointment.iconName} size={22} />
       </View>
       <View style={styles.content}>
-        <Text style={styles.specialty}>{appointment.specialty}</Text>
+        <Text style={[styles.specialty, { color: tone.foreground }]}>{appointment.specialty}</Text>
         <Text style={styles.doctor}>{appointment.doctorName}</Text>
         <View style={styles.locationRow}>
           <Ionicons color={COLORS.textMuted} name="location-outline" size={14} />
           <Text style={styles.location}>{appointment.location}</Text>
         </View>
       </View>
-      <View style={styles.dateBlock}>
+      <View style={[styles.dateBlock, { backgroundColor: tone.background }]}>
         <Text style={styles.date}>{appointment.date}</Text>
-        <Text style={styles.time}>{appointment.time}</Text>
+        <Text style={[styles.time, { color: tone.foreground }]}>{appointment.time}</Text>
       </View>
     </CustomCard>
   );
@@ -36,13 +39,13 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
 const styles = StyleSheet.create({
   card: {
     alignItems: "center",
+    borderLeftWidth: 4,
     flexDirection: "row",
     gap: SPACING.md,
     padding: SPACING.lg,
   },
   iconWrap: {
     alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
     borderRadius: SPACING.lg,
     height: SPACING.xxxl + SPACING.md,
     justifyContent: "center",
@@ -52,7 +55,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   specialty: {
-    color: COLORS.primaryDark,
+    color: COLORS.text,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontWeight: TYPOGRAPHY.weights.bold,
   },
@@ -75,7 +78,10 @@ const styles = StyleSheet.create({
   },
   dateBlock: {
     alignItems: "flex-end",
+    borderRadius: SPACING.lg,
     gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
   },
   date: {
     color: COLORS.black,

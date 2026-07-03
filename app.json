@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "healthy-you",
+    "name": "Healthy You",
     "slug": "healthy-you",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -26,7 +26,7 @@
         "android.permission.health.READ_EXERCISE"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#20D6D2",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

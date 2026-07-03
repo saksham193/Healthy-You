@@ -5,16 +5,21 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getToneColors, type ToneColors } from "../../utils/tone";
 import type { HomeFeature } from "../../types";
 
 type FeatureGridCardProps = {
   feature: HomeFeature;
   onPress?: () => void;
+  toneColorsOverride?: ToneColors;
 };
 
-export default function FeatureGridCard({ feature, onPress }: FeatureGridCardProps) {
-  const tone = getToneColors(feature.tone);
+export default function FeatureGridCard({
+  feature,
+  onPress,
+  toneColorsOverride,
+}: FeatureGridCardProps) {
+  const tone = toneColorsOverride ?? getToneColors(feature.tone);
 
   return (
     <TouchableOpacity activeOpacity={0.84} onPress={onPress} style={styles.touchable}>

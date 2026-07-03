@@ -5,7 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getScheduleToneColors } from "../../utils/tone";
 import type { TimelineEvent, TimelineStatus, Tone } from "../../types";
 
 type TimelineEventCardProps = {
@@ -26,7 +26,7 @@ const statusLabel: Record<TimelineStatus, string> = {
 };
 
 export default function TimelineEventCard({ event, isLast = false }: TimelineEventCardProps) {
-  const tone = getToneColors(statusTone[event.status]);
+  const tone = getScheduleToneColors(statusTone[event.status]);
 
   return (
     <View style={styles.row}>

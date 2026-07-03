@@ -16,6 +16,14 @@ type AppHeaderProps = {
   onBackPress?: () => void;
   rightAction?: ReactNode;
   children?: ReactNode;
+  theme?: {
+    backgroundColor?: string;
+    glowColor?: string;
+    glowAccentColor?: string;
+    subtitleColor?: string;
+    foregroundColor?: string;
+    actionBackgroundColor?: string;
+  };
 };
 
 export default function AppHeader({
@@ -26,20 +34,23 @@ export default function AppHeader({
   onBackPress,
   rightAction,
   children,
+  theme,
 }: AppHeaderProps) {
   const leftIcon: IconName = showBackButton ? "chevron-back" : "heart";
+  const foregroundColor = theme?.foregroundColor ?? COLORS.white;
+  const actionBackgroundColor = theme?.actionBackgroundColor ?? COLORS.overlaySoft;
 
   return (
-    <View style={styles.header}>
-      <View style={styles.glowOne} />
-      <View style={styles.glowTwo} />
+    <View style={[styles.header, theme?.backgroundColor ? { backgroundColor: theme.backgroundColor } : null]}>
+      <View style={[styles.glowOne, theme?.glowColor ? { backgroundColor: theme.glowColor } : null]} />
+      <View style={[styles.glowTwo, theme?.glowAccentColor ? { backgroundColor: theme.glowAccentColor } : null]} />
 
       <View style={styles.statusRow}>
-        <Text style={styles.time}>9:41</Text>
+        <Text style={[styles.time, { color: foregroundColor }]}>9:41</Text>
         <View style={styles.statusIcons}>
-          <Ionicons color={COLORS.white} name="cellular" size={15} />
-          <Ionicons color={COLORS.white} name="wifi" size={15} />
-          <Ionicons color={COLORS.white} name="battery-full" size={18} />
+          <Ionicons color={foregroundColor} name="cellular" size={15} />
+          <Ionicons color={foregroundColor} name="wifi" size={15} />
+          <Ionicons color={foregroundColor} name="battery-full" size={18} />
         </View>
       </View>
 
@@ -50,28 +61,34 @@ export default function AppHeader({
             accessibilityRole="button"
             activeOpacity={0.72}
             onPress={onBackPress}
-            style={styles.headerAction}
+            style={[styles.headerAction, { backgroundColor: actionBackgroundColor }]}
           >
-            <Ionicons color={COLORS.white} name={leftIcon} size={18} />
+            <Ionicons color={foregroundColor} name={leftIcon} size={18} />
           </TouchableOpacity>
         ) : (
-          <View accessibilityLabel="Healthy You" style={styles.headerAction}>
-            <Ionicons color={COLORS.white} name={leftIcon} size={18} />
+          <View
+            accessibilityLabel="Healthy You"
+            style={[styles.headerAction, { backgroundColor: actionBackgroundColor }]}
+          >
+            <Ionicons color={foregroundColor} name={leftIcon} size={18} />
           </View>
         )}
 
         <View style={styles.titleBlock}>
-          <Text numberOfLines={1} style={styles.title}>
+          <Text numberOfLines={1} style={[styles.title, { color: foregroundColor }]}>
             {title}
           </Text>
           {subtitle ? (
-            <Text numberOfLines={1} style={styles.subtitle}>
+            <Text
+              numberOfLines={1}
+              style={[styles.subtitle, theme?.subtitleColor ? { color: theme.subtitleColor } : null]}
+            >
               {subtitle}
             </Text>
           ) : null}
         </View>
 
-        <View style={styles.headerAction}>
+        <View style={[styles.headerAction, { backgroundColor: actionBackgroundColor }]}>
           {rightAction ?? <View style={styles.placeholder} />}
         </View>
       </View>

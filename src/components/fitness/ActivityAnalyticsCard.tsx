@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
 import ProgressRing from "../layout/ProgressRing";
-import { COLORS } from "../../theme/colors";
+import { COLORS, FITNESS_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { FitnessSummary } from "../../types";
@@ -20,7 +20,13 @@ export default function ActivityAnalyticsCard({ summary }: ActivityAnalyticsCard
   return (
     <CustomCard style={styles.card}>
       <View style={styles.analyticsCard}>
-        <ProgressRing max={100} size={72} value={clampPercent(summary.stepProgress)} />
+        <ProgressRing
+          backgroundColor={FITNESS_COLORS.light}
+          color={FITNESS_COLORS.primary}
+          max={100}
+          size={72}
+          value={clampPercent(summary.stepProgress)}
+        />
         <Text style={styles.metricTitle}>Steps Ring</Text>
         <Text style={styles.metricValue}>{summary.steps.toLocaleString("en-US")}</Text>
       </View>
@@ -32,7 +38,13 @@ export default function ActivityAnalyticsCard({ summary }: ActivityAnalyticsCard
         <Text style={styles.metricValue}>{summary.caloriesBurned} kcal</Text>
       </View>
       <View style={styles.analyticsCard}>
-        <ProgressRing max={100} size={72} value={clampPercent(activeMinutesPercent)} />
+        <ProgressRing
+          backgroundColor={FITNESS_COLORS.light}
+          color={FITNESS_COLORS.primary}
+          max={100}
+          size={72}
+          value={clampPercent(activeMinutesPercent)}
+        />
         <Text style={styles.metricTitle}>Active Minutes</Text>
         <Text style={styles.metricValue}>{summary.weeklyActivityMinutes} min</Text>
       </View>

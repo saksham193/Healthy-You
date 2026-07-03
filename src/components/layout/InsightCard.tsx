@@ -5,7 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getToneColors, type ToneColors } from "../../utils/tone";
 import type { IconName, Tone } from "../../types";
 
 type InsightCardProps = {
@@ -14,10 +14,21 @@ type InsightCardProps = {
   detail: string;
   iconName: IconName;
   tone: Tone;
+  toneColorsOverride?: ToneColors;
+  statusToneColorsOverride?: ToneColors;
 };
 
-export default function InsightCard({ title, status, detail, iconName, tone }: InsightCardProps) {
-  const toneColors = getToneColors(tone);
+export default function InsightCard({
+  title,
+  status,
+  detail,
+  iconName,
+  tone,
+  toneColorsOverride,
+  statusToneColorsOverride,
+}: InsightCardProps) {
+  const toneColors = toneColorsOverride ?? getToneColors(tone);
+  const statusToneColors = statusToneColorsOverride ?? toneColors;
 
   return (
     <CustomCard style={styles.card}>
@@ -27,8 +38,8 @@ export default function InsightCard({ title, status, detail, iconName, tone }: I
       <View style={styles.content}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>{title}</Text>
-          <View style={[styles.chip, { backgroundColor: toneColors.background }]}>
-            <Text style={[styles.chipText, { color: toneColors.foreground }]}>{status}</Text>
+          <View style={[styles.chip, { backgroundColor: statusToneColors.background }]}>
+            <Text style={[styles.chipText, { color: statusToneColors.foreground }]}>{status}</Text>
           </View>
         </View>
         <Text style={styles.detail}>{detail}</Text>

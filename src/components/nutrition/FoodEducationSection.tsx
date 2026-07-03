@@ -3,7 +3,7 @@ import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "rea
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
 import DashboardSection from "../layout/DashboardSection";
-import { COLORS } from "../../theme/colors";
+import { COLORS, NUTRITION_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { IconName, Tone } from "../../types";
@@ -82,7 +82,7 @@ const toneColor = (tone: Tone): string => {
       return COLORS.danger;
     case "primary":
     default:
-      return COLORS.primary;
+      return NUTRITION_COLORS.secondary;
   }
 };
 
@@ -263,13 +263,13 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   highlightChip: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: NUTRITION_COLORS.light,
     borderRadius: 16,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
   },
   highlightText: {
-    color: COLORS.primaryDark,
+    color: NUTRITION_COLORS.dark,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontWeight: TYPOGRAPHY.weights.bold,
   },

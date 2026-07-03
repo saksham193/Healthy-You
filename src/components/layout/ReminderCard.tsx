@@ -14,25 +14,35 @@ type ReminderCardProps = {
   icon: IconName;
   status?: string;
   repeatLabel?: string;
+  accentColor?: string;
+  backgroundColor?: string;
 };
 
-export default function ReminderCard({ title, time, icon, status, repeatLabel }: ReminderCardProps) {
+export default function ReminderCard({
+  title,
+  time,
+  icon,
+  status,
+  repeatLabel,
+  accentColor = COLORS.primary,
+  backgroundColor = COLORS.primaryLight,
+}: ReminderCardProps) {
   return (
     <View style={styles.timeline}>
       <View style={styles.timeBlock}>
         <Text style={styles.time}>{time}</Text>
       </View>
-      <View style={styles.dot} />
+      <View style={[styles.dot, { backgroundColor: accentColor }]} />
       <CustomCard style={styles.card}>
-        <View style={styles.icon}>
-          <Ionicons color={COLORS.primary} name={icon} size={24} />
+        <View style={[styles.icon, { backgroundColor }]}>
+          <Ionicons color={accentColor} name={icon} size={24} />
         </View>
         <View style={styles.content}>
           <Text style={styles.title}>{title}</Text>
           {status ? <Text style={styles.subtitle}>{status}</Text> : null}
           {repeatLabel ? <Text style={styles.repeat}>{repeatLabel}</Text> : null}
         </View>
-        <Ionicons color={COLORS.primary} name="notifications-outline" size={20} />
+        <Ionicons color={accentColor} name="notifications-outline" size={20} />
       </CustomCard>
     </View>
   );

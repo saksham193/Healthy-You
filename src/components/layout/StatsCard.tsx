@@ -5,7 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getToneColors, type ToneColors } from "../../utils/tone";
 import type { IconName, Tone } from "../../types";
 
 type StatsCardProps = {
@@ -15,6 +15,7 @@ type StatsCardProps = {
   icon: IconName;
   tone?: Tone;
   style?: StyleProp<ViewStyle>;
+  toneColorsOverride?: ToneColors;
 };
 
 export default function StatsCard({
@@ -24,8 +25,9 @@ export default function StatsCard({
   icon,
   tone = "primary",
   style,
+  toneColorsOverride,
 }: StatsCardProps) {
-  const toneColors = getToneColors(tone);
+  const toneColors = toneColorsOverride ?? getToneColors(tone);
 
   return (
     <CustomCard style={[styles.card, style]}>
@@ -33,7 +35,7 @@ export default function StatsCard({
         <View style={[styles.iconWrap, { backgroundColor: toneColors.background }]}>
           <Ionicons color={toneColors.foreground} name={icon} size={22} />
         </View>
-        <Text numberOfLines={1} style={styles.title}>
+        <Text numberOfLines={2} style={styles.title}>
           {title}
         </Text>
       </View>

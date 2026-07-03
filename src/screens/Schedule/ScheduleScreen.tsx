@@ -18,10 +18,11 @@ import StatsCard from "../../components/layout/StatsCard";
 import CustomCard from "../../components/common/CustomCard";
 import ScreenContainer from "../../components/common/ScreenContainer";
 import { useHealthData } from "../../hooks/useHealthData";
-import { COLORS } from "../../theme/colors";
+import { COLORS, SCHEDULE_COLORS } from "../../theme/colors";
 import { SHADOWS } from "../../theme/shadows";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
+import { getScheduleHabitToneColors, getScheduleToneColors } from "../../utils/tone";
 
 export default function ScheduleScreen() {
   const { data, error, loading } = useHealthData();
@@ -30,7 +31,18 @@ export default function ScheduleScreen() {
   if (!schedule) {
     return (
       <ScreenContainer>
-        <AppHeader title="Health Schedule" subtitle="Stay on track with your daily goals" />
+        <AppHeader
+          subtitle="Stay on track with your daily goals"
+          theme={{
+            actionBackgroundColor: "rgba(97, 19, 58, 0.10)",
+            backgroundColor: SCHEDULE_COLORS.secondary,
+            foregroundColor: SCHEDULE_COLORS.ink,
+            glowAccentColor: SCHEDULE_COLORS.primary,
+            glowColor: SCHEDULE_COLORS.light,
+            subtitleColor: SCHEDULE_COLORS.ink,
+          }}
+          title="Health Schedule"
+        />
         <ScreenSheet>
           <CustomCard style={styles.emptyCard}>
             <EmptyState
@@ -47,6 +59,7 @@ export default function ScheduleScreen() {
   const { summary } = schedule;
   const hydrationRemaining = summary.waterGoal - summary.waterGlasses;
   const priorityReminder = schedule.timelineEvents.find((event) => event.status === "upcoming");
+  const waterTone = getScheduleHabitToneColors("drink-water", "Drink Water");
   const handleQuickAddWater = () => {
     Alert.alert("Water Tracking", "One glass of water is ready to log when tracking is connected.");
   };
@@ -56,9 +69,26 @@ export default function ScheduleScreen() {
 
   return (
     <ScreenContainer>
-      <AppHeader title="Health Schedule" subtitle="Stay on track with your daily goals">
+      <AppHeader
+        subtitle="Stay on track with your daily goals"
+        theme={{
+          actionBackgroundColor: "rgba(97, 19, 58, 0.10)",
+          backgroundColor: SCHEDULE_COLORS.secondary,
+          foregroundColor: SCHEDULE_COLORS.ink,
+          glowAccentColor: SCHEDULE_COLORS.primary,
+          glowColor: SCHEDULE_COLORS.light,
+          subtitleColor: SCHEDULE_COLORS.ink,
+        }}
+        title="Health Schedule"
+      >
         <CustomCard style={styles.headerCard}>
-          <ProgressRing max={100} size={76} value={summary.completionPercent} />
+          <ProgressRing
+            backgroundColor={SCHEDULE_COLORS.light}
+            color={SCHEDULE_COLORS.dark}
+            max={100}
+            size={76}
+            value={summary.completionPercent}
+          />
           <View style={styles.headerCopy}>
             <Text style={styles.headerMetric}>{summary.completionPercent}% Complete</Text>
             <Text style={styles.headerText}>
@@ -72,6 +102,8 @@ export default function ScheduleScreen() {
         <CustomCard style={styles.overviewCard}>
           <View style={styles.overviewFocus}>
             <ProgressRing
+              backgroundColor={SCHEDULE_COLORS.light}
+              color={SCHEDULE_COLORS.dark}
               max={summary.totalTasks}
               size={112}
               value={summary.completedTasks}
@@ -92,6 +124,7 @@ export default function ScheduleScreen() {
               subtitle="Tasks completed"
               title="Completed"
               tone="accent"
+              toneColorsOverride={getScheduleToneColors("accent")}
               value={`${summary.completedTasks}`}
             />
             <StatsCard
@@ -99,6 +132,7 @@ export default function ScheduleScreen() {
               subtitle="Still scheduled"
               title="Remaining"
               tone="warning"
+              toneColorsOverride={getScheduleToneColors("warning")}
               value={`${summary.remainingTasks}`}
             />
           </View>
@@ -128,6 +162,8 @@ export default function ScheduleScreen() {
         {priorityReminder ? (
           <ReminderCard
             icon={priorityReminder.iconName}
+            accentColor={SCHEDULE_COLORS.dark}
+            backgroundColor={SCHEDULE_COLORS.light}
             repeatLabel="Smart planner reminder"
             status={priorityReminder.subtitle}
             time={priorityReminder.time}
@@ -156,6 +192,8 @@ export default function ScheduleScreen() {
         <CustomCard style={styles.hydrationCard}>
           <ProgressRing
             max={summary.waterGoal}
+            backgroundColor={waterTone.background}
+            color={waterTone.foreground}
             size={96}
             value={summary.waterGlasses}
           />
@@ -173,7 +211,7 @@ export default function ScheduleScreen() {
             accessibilityRole="button"
             activeOpacity={0.84}
             onPress={handleQuickAddWater}
-            style={styles.quickAddButton}
+            style={[styles.quickAddButton, { backgroundColor: waterTone.foreground }]}
           >
             <Ionicons color={COLORS.white} name="add" size={20} />
             <Text style={styles.quickAddText}>Quick Add</Text>
@@ -219,9 +257,11 @@ export default function ScheduleScreen() {
 
         <DashboardSection title="Weekly Adherence" />
         <ActivityChart
+          accentColor={SCHEDULE_COLORS.dark}
           labels={schedule.adherenceData.labels}
           subtitle="Health routine consistency"
           title="Medication Adherence"
+          trackColor={SCHEDULE_COLORS.light}
           values={schedule.adherenceData.values}
         />
 
@@ -238,6 +278,7 @@ export default function ScheduleScreen() {
                 onPress={() => handleScheduleAction(action.title)}
                 title={action.title}
                 tone={action.tone}
+                toneColorsOverride={getScheduleToneColors(action.tone)}
               />
             </View>
           ))}
@@ -344,7 +385,7 @@ const styles = StyleSheet.create({
   },
   quickAddButton: {
     alignItems: "center",
-    backgroundColor: COLORS.primary,
+    backgroundColor: SCHEDULE_COLORS.dark,
     borderRadius: SPACING.xl,
     flexDirection: "row",
     gap: SPACING.xs,

@@ -19,9 +19,10 @@ import ScreenSheet from "../../components/layout/ScreenSheet";
 import StatsCard from "../../components/layout/StatsCard";
 import EmptyState from "../../components/layout/EmptyState";
 import { useHealthData } from "../../hooks/useHealthData";
-import { COLORS } from "../../theme/colors";
+import { COLORS, FITNESS_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
+import { getFitnessToneColors } from "../../utils/tone";
 
 export default function FitnessScreen() {
   const { data, error, loading } = useHealthData();
@@ -31,10 +32,23 @@ export default function FitnessScreen() {
     return (
       <ScreenContainer>
         <View style={styles.shell}>
-          <AppHeader showSearch subtitle="Track workouts, calories and activity" title="Fitness Overview" />
+          <AppHeader
+            showSearch
+            subtitle="Track workouts, calories and activity"
+            theme={{
+              backgroundColor: FITNESS_COLORS.dark,
+              glowAccentColor: FITNESS_COLORS.ink,
+              glowColor: FITNESS_COLORS.secondary,
+              subtitleColor: FITNESS_COLORS.light,
+            }}
+            title="Fitness Overview"
+          />
           <ScreenSheet>
             <EmptyState
+              accentColor={FITNESS_COLORS.primary}
+              backgroundColor={FITNESS_COLORS.light}
               icon={error ? "alert-circle-outline" : "fitness-outline"}
+              loading={!error && loading}
               subtitle={error ?? (loading ? "Loading your fitness dashboard." : "Fitness data is unavailable.")}
               title={error ? "Unable to load fitness" : "Preparing fitness"}
             />
@@ -64,6 +78,12 @@ export default function FitnessScreen() {
         <AppHeader
           showSearch
           subtitle="Track workouts, calories and activity"
+          theme={{
+            backgroundColor: FITNESS_COLORS.dark,
+            glowAccentColor: FITNESS_COLORS.ink,
+            glowColor: FITNESS_COLORS.secondary,
+            subtitleColor: FITNESS_COLORS.light,
+          }}
           title="Fitness Overview"
         >
           <CustomCard style={styles.scoreCard}>
@@ -73,7 +93,7 @@ export default function FitnessScreen() {
               <Text style={styles.scoreStatus}>{summary.scoreLabel}</Text>
             </View>
             <View style={styles.scoreIcon}>
-              <Ionicons color={COLORS.primary} name="fitness-outline" size={24} />
+              <Ionicons color={FITNESS_COLORS.primary} name="fitness-outline" size={24} />
             </View>
           </CustomCard>
         </AppHeader>
@@ -84,9 +104,11 @@ export default function FitnessScreen() {
 
           <DashboardSection title="Weekly Activity" />
           <ActivityChart
+            accentColor={FITNESS_COLORS.primary}
             labels={activityLabels}
             subtitle={summary.weeklyTrend}
             title={`${summary.weeklyActivityMinutes} mins`}
+            trackColor={FITNESS_COLORS.light}
             values={activityValues}
           />
 
@@ -107,6 +129,8 @@ export default function FitnessScreen() {
               </View>
             </View>
             <ProgressRing
+              backgroundColor={FITNESS_COLORS.light}
+              color={FITNESS_COLORS.primary}
               max={summary.calorieGoal}
               size={SPACING.bottomNavOffset}
               value={summary.caloriesBurned}
@@ -116,7 +140,12 @@ export default function FitnessScreen() {
           <DashboardSection title="Workout Progress" />
           <CustomCard style={styles.progressCard}>
             <View style={styles.progressHeader}>
-              <ProgressRing max={100} value={summary.workoutProgress} />
+              <ProgressRing
+                backgroundColor={FITNESS_COLORS.light}
+                color={FITNESS_COLORS.primary}
+                max={100}
+                value={summary.workoutProgress}
+              />
               <View style={styles.progressCopy}>
                 <Text style={styles.cardTitle}>Today's Workout Progress</Text>
                 <Text style={styles.progressValue}>{summary.workoutProgress}%</Text>
@@ -186,7 +215,7 @@ export default function FitnessScreen() {
           <DashboardSection title="Step Counter" />
           <CustomCard style={styles.stepCard}>
             <View style={styles.stepIcon}>
-              <Ionicons color={COLORS.primary} name="walk-outline" size={24} />
+              <Ionicons color={FITNESS_COLORS.primary} name="walk-outline" size={24} />
             </View>
             <View style={styles.stepContent}>
               <Text style={styles.cardEyebrow}>Steps</Text>
@@ -196,7 +225,12 @@ export default function FitnessScreen() {
                 <View style={[styles.stepFill, { width: `${summary.stepProgress}%` }]} />
               </View>
             </View>
-            <ProgressRing max={100} value={summary.stepProgress} />
+            <ProgressRing
+              backgroundColor={FITNESS_COLORS.light}
+              color={FITNESS_COLORS.primary}
+              max={100}
+              value={summary.stepProgress}
+            />
           </CustomCard>
 
           <DashboardSection title="Exercise Categories" />
@@ -229,6 +263,7 @@ export default function FitnessScreen() {
                   status={insight.status}
                   title={insight.title}
                   tone={insight.tone}
+                  toneColorsOverride={getFitnessToneColors(insight.tone)}
                 />
               ))}
             </View>
@@ -252,6 +287,7 @@ export default function FitnessScreen() {
                   onPress={() => handleFitnessAction(action.title)}
                   title={action.title}
                   tone={action.tone}
+                  toneColorsOverride={getFitnessToneColors(action.tone)}
                 />
               ))}
             </View>
@@ -271,6 +307,7 @@ export default function FitnessScreen() {
               subtitle={`${caloriesProgress}% of daily goal`}
               title="Burn Goal"
               tone="warning"
+              toneColorsOverride={getFitnessToneColors("primary")}
               value={`${summary.caloriesRemaining} kcal left`}
             />
             <StatsCard
@@ -278,6 +315,7 @@ export default function FitnessScreen() {
               subtitle={`${summary.stepProgress}% complete`}
               title="Steps"
               tone="accent"
+              toneColorsOverride={getFitnessToneColors("primary")}
               value={stepCount}
             />
           </View>
@@ -311,14 +349,14 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   scoreStatus: {
-    color: COLORS.accent,
+    color: FITNESS_COLORS.primary,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.bold,
     marginTop: SPACING.xs,
   },
   scoreIcon: {
     alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: FITNESS_COLORS.light,
     borderRadius: SPACING.xl,
     height: SPACING.xxxl + SPACING.xxl,
     justifyContent: "center",
@@ -353,7 +391,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
   },
   metricPill: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: FITNESS_COLORS.light,
     borderRadius: SPACING.lg,
     flexGrow: 1,
     padding: SPACING.md,
@@ -364,7 +402,7 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.weights.semibold,
   },
   metricValue: {
-    color: COLORS.primaryDark,
+    color: FITNESS_COLORS.dark,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.heavy,
     marginTop: SPACING.xs,
@@ -388,7 +426,7 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.weights.bold,
   },
   progressValue: {
-    color: COLORS.primary,
+    color: FITNESS_COLORS.primary,
     fontSize: TYPOGRAPHY.sizes.xxl,
     fontWeight: TYPOGRAPHY.weights.heavy,
     marginTop: SPACING.xs,
@@ -406,7 +444,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   progressFill: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: FITNESS_COLORS.primary,
     borderRadius: SPACING.sm,
     height: "100%",
   },
@@ -426,14 +464,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   bmiMetrics: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: FITNESS_COLORS.light,
     borderRadius: SPACING.lg,
     gap: SPACING.xs,
     minWidth: SPACING.cardMinWidth,
     padding: SPACING.md,
   },
   bmiMetricValue: {
-    color: COLORS.primaryDark,
+    color: FITNESS_COLORS.dark,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.heavy,
   },
@@ -459,7 +497,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: SPACING.sm,
   },
   scaleIndicator: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: FITNESS_COLORS.primary,
     borderRadius: SPACING.sm,
     height: SPACING.xxl,
     left: "48%",
@@ -484,7 +522,7 @@ const styles = StyleSheet.create({
   },
   stepIcon: {
     alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: FITNESS_COLORS.light,
     borderRadius: SPACING.xl,
     height: SPACING.xxxl + SPACING.xxl,
     justifyContent: "center",
@@ -495,7 +533,7 @@ const styles = StyleSheet.create({
     minWidth: SPACING.cardMinWidth,
   },
   stepFill: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: FITNESS_COLORS.primary,
     borderRadius: SPACING.sm,
     height: "100%",
   },

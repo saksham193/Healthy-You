@@ -3,10 +3,10 @@ import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "rea
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
 import DashboardSection from "../layout/DashboardSection";
-import { COLORS } from "../../theme/colors";
+import { COLORS, FITNESS_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getFitnessToneColors } from "../../utils/tone";
 import type { HealthGoal, IconName, ProfileData, Tone } from "../../types";
 
 type ExerciseRecommendation = {
@@ -112,7 +112,7 @@ export default function ExerciseRecommendationSection({
         showsHorizontalScrollIndicator={false}
       >
         {recommendations.map((recommendation) => {
-          const tone = getToneColors(recommendation.tone);
+          const tone = getFitnessToneColors(recommendation.tone);
 
           return (
             <TouchableOpacity
@@ -160,7 +160,7 @@ export default function ExerciseRecommendationSection({
             </View>
             <Text style={styles.detailText}>{selectedRecommendation?.description}</Text>
             <View style={styles.inlineCta}>
-              <Ionicons color={COLORS.primary} name="play-circle-outline" size={20} />
+              <Ionicons color={FITNESS_COLORS.primary} name="play-circle-outline" size={20} />
               <Text style={styles.inlineCtaText}>Preview workout</Text>
             </View>
           </CustomCard>
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   },
   playButton: {
     alignItems: "center",
-    backgroundColor: COLORS.primary,
+    backgroundColor: FITNESS_COLORS.primary,
     borderRadius: 12,
     bottom: SPACING.sm,
     height: 24,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   modalBackdrop: {
-    backgroundColor: "rgba(20, 13, 53, 0.32)",
+    backgroundColor: "rgba(76, 29, 149, 0.28)",
     flex: 1,
     justifyContent: "flex-end",
     padding: SPACING.lg,
@@ -253,14 +253,14 @@ const styles = StyleSheet.create({
   },
   inlineCta: {
     alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: FITNESS_COLORS.light,
     borderRadius: SPACING.lg,
     flexDirection: "row",
     gap: SPACING.sm,
     padding: SPACING.md,
   },
   inlineCtaText: {
-    color: COLORS.primaryDark,
+    color: FITNESS_COLORS.dark,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.bold,
   },

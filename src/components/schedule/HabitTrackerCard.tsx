@@ -5,7 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getScheduleHabitToneColors } from "../../utils/tone";
 import type { Habit } from "../../types";
 
 type HabitTrackerCardProps = {
@@ -13,10 +13,10 @@ type HabitTrackerCardProps = {
 };
 
 export default function HabitTrackerCard({ habit }: HabitTrackerCardProps) {
-  const tone = getToneColors(habit.completed ? "accent" : habit.tone);
+  const tone = getScheduleHabitToneColors(habit.id, habit.title);
 
   return (
-    <CustomCard style={styles.card}>
+    <CustomCard style={[styles.card, { borderLeftColor: tone.foreground }]}>
       <View style={[styles.iconWrap, { backgroundColor: tone.background }]}>
         <Ionicons color={tone.foreground} name={habit.iconName} size={21} />
       </View>
@@ -24,11 +24,16 @@ export default function HabitTrackerCard({ habit }: HabitTrackerCardProps) {
         <Text style={styles.title}>{habit.title}</Text>
         <Text style={styles.streak}>{habit.streak}</Text>
       </View>
-      <Ionicons
-        color={habit.completed ? COLORS.accent : COLORS.textMuted}
-        name={habit.completed ? "checkmark-circle" : "ellipse-outline"}
-        size={24}
-      />
+      <View style={[styles.checkChip, { backgroundColor: habit.completed ? tone.background : COLORS.surfaceMuted }]}>
+        <Ionicons
+          color={habit.completed ? tone.foreground : COLORS.textMuted}
+          name={habit.completed ? "checkmark-circle" : "ellipse-outline"}
+          size={14}
+        />
+        <Text style={[styles.checkText, { color: habit.completed ? tone.foreground : COLORS.textMuted }]}>
+          {habit.completed ? "Done" : "Due"}
+        </Text>
+      </View>
     </CustomCard>
   );
 }
@@ -36,6 +41,7 @@ export default function HabitTrackerCard({ habit }: HabitTrackerCardProps) {
 const styles = StyleSheet.create({
   card: {
     alignItems: "center",
+    borderLeftWidth: 4,
     flexBasis: "48%",
     flexDirection: "row",
     flexGrow: 1,
@@ -62,5 +68,17 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.xs,
     marginTop: SPACING.xs,
+  },
+  checkChip: {
+    alignItems: "center",
+    borderRadius: SPACING.lg,
+    flexDirection: "row",
+    gap: 3,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  checkText: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
   },
 });

@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
 import ProgressRing from "../layout/ProgressRing";
-import { COLORS } from "../../theme/colors";
+import { COLORS, SCHEDULE_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { SleepSchedule } from "../../types";
@@ -18,7 +18,7 @@ export default function SleepScheduleCard({ schedule }: SleepScheduleCardProps) 
       <View style={styles.routine}>
         <View style={styles.timeBlock}>
           <View style={styles.iconWrap}>
-            <Ionicons color={COLORS.primary} name="moon-outline" size={22} />
+            <Ionicons color={SCHEDULE_COLORS.dark} name="moon-outline" size={22} />
           </View>
           <Text style={styles.label}>Bedtime</Text>
           <Text style={styles.time}>{schedule.bedtime}</Text>
@@ -32,7 +32,13 @@ export default function SleepScheduleCard({ schedule }: SleepScheduleCardProps) 
         </View>
       </View>
       <View style={styles.progress}>
-        <ProgressRing max={100} size={82} value={schedule.progressPercent} />
+        <ProgressRing
+          backgroundColor={SCHEDULE_COLORS.light}
+          color={SCHEDULE_COLORS.dark}
+          max={100}
+          size={82}
+          value={schedule.progressPercent}
+        />
         <View style={styles.progressCopy}>
           <Text style={styles.progressTitle}>Sleep goal progress</Text>
           <Text style={styles.progressText}>
@@ -55,7 +61,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   timeBlock: {
-    backgroundColor: COLORS.surfaceMuted,
+    backgroundColor: SCHEDULE_COLORS.light,
     borderRadius: SPACING.lg,
     flex: 1,
     minWidth: SPACING.cardMinWidth,

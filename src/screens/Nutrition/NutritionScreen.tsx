@@ -25,10 +25,11 @@ import NutritionActionCard from "../../components/nutrition/NutritionActionCard"
 import NutritionInsightCard from "../../components/nutrition/NutritionInsightCard";
 import NutritionMealCard from "../../components/nutrition/NutritionMealCard";
 import { useHealthData } from "../../hooks/useHealthData";
-import { COLORS } from "../../theme/colors";
+import { COLORS, NUTRITION_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { MacroNutrient } from "../../types";
+import { getNutritionInsightToneColors, getNutritionMacroToneColors } from "../../utils/tone";
 
 const nutritionTabs = ["Personalized Plan", "Ayurveda", "Recipes"] as const;
 type NutritionTab = (typeof nutritionTabs)[number];
@@ -58,10 +59,25 @@ export default function NutritionScreen() {
     return (
       <ScreenContainer>
         <View style={styles.shell}>
-          <AppHeader showSearch subtitle="Track calories, hydration and meals" title="Daily Nutrition" />
+          <AppHeader
+            showSearch
+            subtitle="Track calories, hydration and meals"
+            theme={{
+              actionBackgroundColor: "rgba(6, 78, 59, 0.10)",
+              backgroundColor: NUTRITION_COLORS.primary,
+              foregroundColor: NUTRITION_COLORS.ink,
+              glowAccentColor: NUTRITION_COLORS.secondary,
+              glowColor: NUTRITION_COLORS.light,
+              subtitleColor: NUTRITION_COLORS.ink,
+            }}
+            title="Daily Nutrition"
+          />
           <ScreenSheet>
             <EmptyState
+              accentColor={NUTRITION_COLORS.secondary}
+              backgroundColor={NUTRITION_COLORS.light}
               icon={error ? "alert-circle-outline" : "nutrition-outline"}
+              loading={!error && loading}
               subtitle={error ?? (loading ? "Loading your nutrition dashboard." : "Nutrition data is unavailable.")}
               title={error ? "Unable to load nutrition" : "Preparing nutrition"}
             />
@@ -78,6 +94,8 @@ export default function NutritionScreen() {
   const carbs = getMacro(nutrition.macros, "carbs");
   const fat = getMacro(nutrition.macros, "fat");
   const macroRows = [protein, carbs, fat].filter((macro): macro is MacroNutrient => Boolean(macro));
+  const calorieTone = getNutritionInsightToneColors("calories", "Calories", "primary");
+  const waterTone = getNutritionInsightToneColors("hydration", "Hydration", "warning");
   const onTabsLayout = (event: LayoutChangeEvent): void => {
     setSegmentWidth(event.nativeEvent.layout.width / nutritionTabs.length);
   };
@@ -91,6 +109,14 @@ export default function NutritionScreen() {
         <AppHeader
           showSearch
           subtitle="Track calories, hydration and meals"
+          theme={{
+            actionBackgroundColor: "rgba(6, 78, 59, 0.10)",
+            backgroundColor: NUTRITION_COLORS.primary,
+            foregroundColor: NUTRITION_COLORS.ink,
+            glowAccentColor: NUTRITION_COLORS.secondary,
+            glowColor: NUTRITION_COLORS.light,
+            subtitleColor: NUTRITION_COLORS.ink,
+          }}
           title="Daily Nutrition"
         >
           <CustomCard style={styles.scoreCard}>
@@ -100,7 +126,7 @@ export default function NutritionScreen() {
               <Text style={styles.scoreStatus}>{summary.scoreLabel}</Text>
             </View>
             <View style={styles.scoreIcon}>
-              <Ionicons color={COLORS.primary} name="ribbon-outline" size={24} />
+              <Ionicons color={NUTRITION_COLORS.secondary} name="ribbon-outline" size={24} />
             </View>
           </CustomCard>
         </AppHeader>
@@ -153,25 +179,24 @@ export default function NutritionScreen() {
                   <Text style={styles.cardTitle}>Daily Calorie Intake</Text>
                   <Text style={styles.dailySubtitle}>{calorieProgress}% of {summary.calorieGoal} kcal goal</Text>
                   <View style={styles.macroSummaryList}>
-                    {macroRows.map((macro) => (
-                      <View key={macro.id} style={styles.macroSummaryRow}>
-                        <View style={styles.macroSummaryName}>
-                          <View
-                            style={[
-                              styles.macroDot,
-                              macro.id === "protein" && styles.proteinDot,
-                              macro.id === "carbs" && styles.carbsDot,
-                              macro.id === "fat" && styles.fatDot,
-                            ]}
-                          />
-                          <Text style={styles.macroSummaryLabel}>{macro.name}</Text>
+                    {macroRows.map((macro) => {
+                      const macroTone = getNutritionMacroToneColors(macro.id, macro.tone);
+
+                      return (
+                        <View key={macro.id} style={styles.macroSummaryRow}>
+                          <View style={styles.macroSummaryName}>
+                            <View style={[styles.macroDot, { backgroundColor: macroTone.foreground }]} />
+                            <Text style={styles.macroSummaryLabel}>{macro.name}</Text>
+                          </View>
+                          <Text style={styles.macroSummaryValue}>
+                            {macro.consumed}{macro.unit}
+                          </Text>
+                          <Text style={[styles.macroSummaryPercent, { color: macroTone.foreground }]}>
+                            {macro.percent}%
+                          </Text>
                         </View>
-                        <Text style={styles.macroSummaryValue}>
-                          {macro.consumed}{macro.unit}
-                        </Text>
-                        <Text style={styles.macroSummaryPercent}>{macro.percent}%</Text>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 </View>
               </CustomCard>
@@ -182,17 +207,23 @@ export default function NutritionScreen() {
                   <Text style={styles.cardEyebrow}>Calories Consumed</Text>
                   <Text style={styles.heroValue}>{summary.caloriesConsumed} kcal</Text>
                   <View style={styles.metricGrid}>
-                    <View style={styles.metricPill}>
+                    <View style={[styles.metricPill, { backgroundColor: calorieTone.background }]}>
                       <Text style={styles.metricLabel}>Goal</Text>
-                      <Text style={styles.metricValue}>{summary.calorieGoal} kcal</Text>
+                      <Text style={[styles.metricValue, { color: calorieTone.foreground }]}>
+                        {summary.calorieGoal} kcal
+                      </Text>
                     </View>
-                    <View style={styles.metricPill}>
+                    <View style={[styles.metricPill, { backgroundColor: calorieTone.background }]}>
                       <Text style={styles.metricLabel}>Remaining</Text>
-                      <Text style={styles.metricValue}>{summary.caloriesRemaining} kcal</Text>
+                      <Text style={[styles.metricValue, { color: calorieTone.foreground }]}>
+                        {summary.caloriesRemaining} kcal
+                      </Text>
                     </View>
                   </View>
                 </View>
                 <ProgressRing
+                  backgroundColor={calorieTone.background}
+                  color={calorieTone.foreground}
                   max={summary.calorieGoal}
                   size={SPACING.bottomNavOffset}
                   value={summary.caloriesConsumed}
@@ -218,8 +249,8 @@ export default function NutritionScreen() {
 
               <DashboardSection title="Water Intake" />
               <CustomCard style={styles.waterCard}>
-                <View style={styles.waterIcon}>
-                  <Ionicons color={COLORS.cyan} name="water-outline" size={26} />
+                <View style={[styles.waterIcon, { backgroundColor: waterTone.background }]}>
+                  <Ionicons color={waterTone.foreground} name="water-outline" size={26} />
                 </View>
                 <View style={styles.waterContent}>
                   <Text style={styles.cardTitle}>Water Intake</Text>
@@ -227,13 +258,26 @@ export default function NutritionScreen() {
                     {summary.waterGlasses} / {summary.waterGoal} Glasses
                   </Text>
                   <View style={styles.progressTrack}>
-                    <View style={[styles.waterFill, { width: `${waterProgress}%` }]} />
+                    <View
+                      style={[
+                        styles.waterFill,
+                        {
+                          backgroundColor: waterTone.foreground,
+                          width: `${waterProgress}%`,
+                        },
+                      ]}
+                    />
                   </View>
                   <Text style={styles.goalText}>
                     Goal Achieved: {summary.waterGoalAchieved ? "Yes" : "No"}
                   </Text>
                 </View>
-                <ProgressRing max={summary.waterGoal} value={summary.waterGlasses} />
+                <ProgressRing
+                  backgroundColor={waterTone.background}
+                  color={waterTone.foreground}
+                  max={summary.waterGoal}
+                  value={summary.waterGlasses}
+                />
               </CustomCard>
 
               <DashboardSection title="Today's Meals" />
@@ -296,6 +340,8 @@ export default function NutritionScreen() {
                   icon="analytics-outline"
                   subtitle={`${calorieProgress}% of daily goal`}
                   title="Calorie Goal"
+                  tone="accent"
+                  toneColorsOverride={calorieTone}
                   value={`${summary.caloriesRemaining} kcal left`}
                 />
                 <StatsCard
@@ -303,6 +349,7 @@ export default function NutritionScreen() {
                   subtitle={`${waterProgress}% hydrated`}
                   title="Hydration"
                   tone="accent"
+                  toneColorsOverride={waterTone}
                   value={`${summary.waterGlasses} glasses`}
                 />
               </View>
@@ -341,21 +388,21 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   scoreStatus: {
-    color: COLORS.accent,
+    color: NUTRITION_COLORS.dark,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.bold,
     marginTop: SPACING.xs,
   },
   scoreIcon: {
     alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: NUTRITION_COLORS.light,
     borderRadius: SPACING.xl,
     height: SPACING.xxxl + SPACING.xxl,
     justifyContent: "center",
     width: SPACING.xxxl + SPACING.xxl,
   },
   segmentedControl: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: NUTRITION_COLORS.light,
     borderColor: COLORS.border,
     borderRadius: 22,
     borderWidth: 1,
@@ -365,7 +412,7 @@ const styles = StyleSheet.create({
     padding: SPACING.xs,
   },
   segmentIndicator: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: NUTRITION_COLORS.secondary,
     borderRadius: 18,
     bottom: SPACING.xs,
     left: SPACING.xs,
@@ -381,13 +428,13 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   segmentText: {
-    color: COLORS.primaryDark,
+    color: NUTRITION_COLORS.dark,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.bold,
     textAlign: "center",
   },
   segmentTextActive: {
-    color: COLORS.white,
+    color: NUTRITION_COLORS.ink,
   },
   dailyIntakeCard: {
     alignItems: "center",
@@ -402,7 +449,7 @@ const styles = StyleSheet.create({
   donutOuter: {
     alignItems: "center",
     backgroundColor: COLORS.accent,
-    borderColor: COLORS.primary,
+    borderColor: NUTRITION_COLORS.secondary,
     borderRadius: 48,
     borderRightColor: COLORS.warning,
     borderTopColor: COLORS.danger,
@@ -463,7 +510,7 @@ const styles = StyleSheet.create({
     width: 10,
   },
   proteinDot: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: NUTRITION_COLORS.secondary,
   },
   carbsDot: {
     backgroundColor: COLORS.accent,
@@ -518,7 +565,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
   },
   metricPill: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: NUTRITION_COLORS.light,
     borderRadius: SPACING.lg,
     flexGrow: 1,
     padding: SPACING.md,
@@ -529,7 +576,7 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.weights.semibold,
   },
   metricValue: {
-    color: COLORS.primaryDark,
+    color: NUTRITION_COLORS.dark,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.heavy,
     marginTop: SPACING.xs,
@@ -547,7 +594,7 @@ const styles = StyleSheet.create({
   },
   waterIcon: {
     alignItems: "center",
-    backgroundColor: COLORS.primaryDark,
+    backgroundColor: NUTRITION_COLORS.light,
     borderRadius: SPACING.xl,
     height: SPACING.xxxl + SPACING.xxl,
     justifyContent: "center",
@@ -574,7 +621,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   waterFill: {
-    backgroundColor: COLORS.cyan,
+    backgroundColor: NUTRITION_COLORS.secondary,
     borderRadius: SPACING.sm,
     height: "100%",
   },

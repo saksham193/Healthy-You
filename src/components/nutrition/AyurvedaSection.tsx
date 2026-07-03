@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
 import DashboardSection from "../layout/DashboardSection";
-import { COLORS } from "../../theme/colors";
+import { COLORS, NUTRITION_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { IconName } from "../../types";
@@ -58,7 +58,7 @@ export default function AyurvedaSection() {
               style={[styles.doshaCard, active && styles.doshaCardActive]}
             >
               <View style={[styles.doshaIcon, active && styles.doshaIconActive]}>
-                <Ionicons color={active ? COLORS.white : COLORS.primary} name={dosha.iconName} size={30} />
+                <Ionicons color={active ? COLORS.white : NUTRITION_COLORS.secondary} name={dosha.iconName} size={30} />
               </View>
               <Text style={[styles.doshaName, active && styles.doshaNameActive]}>{dosha.name}</Text>
             </TouchableOpacity>
@@ -68,7 +68,7 @@ export default function AyurvedaSection() {
 
       <CustomCard style={styles.summaryCard}>
         <View style={styles.summaryIcon}>
-          <Ionicons color={COLORS.primary} name={selected.iconName} size={24} />
+          <Ionicons color={NUTRITION_COLORS.secondary} name={selected.iconName} size={24} />
         </View>
         <View style={styles.summaryCopy}>
           <Text style={styles.summaryTitle}>{selected.name} (Your Type)</Text>
@@ -96,19 +96,19 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
   },
   doshaCardActive: {
-    backgroundColor: COLORS.primaryLight,
-    borderColor: COLORS.primary,
+    backgroundColor: NUTRITION_COLORS.light,
+    borderColor: NUTRITION_COLORS.secondary,
   },
   doshaIcon: {
     alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: NUTRITION_COLORS.light,
     borderRadius: 24,
     height: 56,
     justifyContent: "center",
     width: 56,
   },
   doshaIconActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: NUTRITION_COLORS.secondary,
   },
   doshaName: {
     color: COLORS.black,
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   doshaNameActive: {
-    color: COLORS.primaryDark,
+    color: NUTRITION_COLORS.dark,
   },
   summaryCard: {
     alignItems: "center",
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   },
   summaryIcon: {
     alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: NUTRITION_COLORS.light,
     borderRadius: 18,
     height: 48,
     justifyContent: "center",

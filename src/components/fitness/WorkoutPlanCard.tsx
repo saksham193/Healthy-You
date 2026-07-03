@@ -5,7 +5,7 @@ import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import { getToneColors } from "../../utils/tone";
+import { getFitnessToneColors } from "../../utils/tone";
 import type { IconName, WorkoutPlan } from "../../types";
 
 type WorkoutPlanCardProps = {
@@ -13,7 +13,7 @@ type WorkoutPlanCardProps = {
 };
 
 export default function WorkoutPlanCard({ workout }: WorkoutPlanCardProps) {
-  const tone = getToneColors(workout.tone);
+  const tone = getFitnessToneColors(workout.tone);
   const isCompleted = workout.status === "completed";
   const statusIcon: IconName = isCompleted ? "checkmark-circle" : "ellipse-outline";
   const statusLabel = workout.status.charAt(0).toUpperCase() + workout.status.slice(1);

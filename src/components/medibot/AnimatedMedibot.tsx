@@ -14,6 +14,7 @@ import { createMedibotListeningAnimation } from "./MedibotListeningAnimation";
 import { createMedibotNotificationAnimation } from "./MedibotNotificationAnimation";
 import { createMedibotTalkAnimation } from "./MedibotTalkAnimation";
 import { createMedibotThinkingAnimation } from "./MedibotThinkingAnimation";
+import { COLORS } from "../../theme/colors";
 
 export type MedibotAnimationState = "idle" | "thinking" | "talking" | "listening" | "notification";
 
@@ -27,9 +28,9 @@ type AnimatedMedibotProps = {
 const mascotSource = require("../../../assets/medibot/medibot-static.png") as ImageSourcePropType;
 
 const GLOW = {
-  primary: "#5A3FFF",
-  secondary: "#6CE5FF",
-  accent: "#FF8A00",
+  primary: COLORS.brandAqua,
+  secondary: COLORS.brandCyan,
+  accent: COLORS.brandDeepBlue,
 };
 
 const createValues = (): MedibotAnimationValues => ({
