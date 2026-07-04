@@ -78,6 +78,28 @@ export type NutritionAction = {
   tone: Tone;
 };
 
+export type NutritionMealType = "breakfast" | "lunch" | "dinner" | "snack";
+
+export type NutritionLogEntry = {
+  id: string;
+  mealType: NutritionMealType;
+  title: string;
+  calories: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  notes?: string;
+  loggedAt: string;
+  dateKey: string;
+};
+
+export type HydrationLogEntry = {
+  id: string;
+  amountMl: number;
+  loggedAt: string;
+  dateKey: string;
+};
+
 export type FitnessSummary = {
   score: number;
   scoreLabel: string;

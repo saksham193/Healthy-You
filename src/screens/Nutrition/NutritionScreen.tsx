@@ -1,11 +1,14 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
   LayoutChangeEvent,
+  Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -25,10 +28,11 @@ import NutritionActionCard from "../../components/nutrition/NutritionActionCard"
 import NutritionInsightCard from "../../components/nutrition/NutritionInsightCard";
 import NutritionMealCard from "../../components/nutrition/NutritionMealCard";
 import { useHealthData } from "../../hooks/useHealthData";
+import { getLocalDateKey, useNutritionStore } from "../../store/nutritionStore";
 import { COLORS, NUTRITION_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import type { MacroNutrient } from "../../types";
+import type { MacroNutrient, NutritionInsight, NutritionLogEntry, NutritionMeal, NutritionMealType } from "../../types";
 import { getNutritionInsightToneColors, getNutritionMacroToneColors } from "../../utils/tone";
 
 const nutritionTabs = ["Personalized Plan", "Ayurveda", "Recipes"] as const;
@@ -37,13 +41,200 @@ type NutritionTab = (typeof nutritionTabs)[number];
 const getMacro = (macros: MacroNutrient[], id: string): MacroNutrient | undefined =>
   macros.find((macro) => macro.id === id);
 
+type MealFormState = {
+  mealType: NutritionMealType;
+  title: string;
+  calories: string;
+  protein: string;
+  carbs: string;
+  fat: string;
+  notes: string;
+};
+
+const mealTypeOptions: Array<{ id: NutritionMealType; label: string }> = [
+  { id: "breakfast", label: "Breakfast" },
+  { id: "lunch", label: "Lunch" },
+  { id: "dinner", label: "Dinner" },
+  { id: "snack", label: "Snack" },
+];
+
+const emptyMealForm: MealFormState = {
+  mealType: "breakfast",
+  title: "",
+  calories: "",
+  protein: "",
+  carbs: "",
+  fat: "",
+  notes: "",
+};
+
+const clampPercent = (value: number): number => Math.max(0, Math.min(100, value));
+
+const parseOptionalAmount = (value: string): number | undefined => {
+  const parsed = Number.parseFloat(value);
+
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+};
+
+const parseRequiredAmount = (value: string): number | null => {
+  const parsed = Number.parseFloat(value);
+
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
+const mealTypeIcon = (mealType: NutritionMealType): NutritionMeal["iconName"] => {
+  if (mealType === "breakfast") return "sunny-outline";
+  if (mealType === "lunch") return "restaurant-outline";
+  if (mealType === "dinner") return "moon-outline";
+
+  return "cafe-outline";
+};
+
+const mealTypeLabel = (mealType: NutritionMealType): string =>
+  mealTypeOptions.find((option) => option.id === mealType)?.label ?? "Meal";
+
+const formFromMeal = (meal: NutritionLogEntry): MealFormState => ({
+  mealType: meal.mealType,
+  title: meal.title,
+  calories: `${meal.calories}`,
+  protein: meal.protein === undefined ? "" : `${meal.protein}`,
+  carbs: meal.carbs === undefined ? "" : `${meal.carbs}`,
+  fat: meal.fat === undefined ? "" : `${meal.fat}`,
+  notes: meal.notes ?? "",
+});
+
+const loggedMealToCardMeal = (meal: NutritionLogEntry): NutritionMeal => {
+  const macros = [
+    meal.protein !== undefined ? `${meal.protein}g protein` : "",
+    meal.carbs !== undefined ? `${meal.carbs}g carbs` : "",
+    meal.fat !== undefined ? `${meal.fat}g fat` : "",
+  ].filter(Boolean);
+  const detail = [
+    mealTypeLabel(meal.mealType),
+    macros.length > 0 ? macros.join(" - ") : "",
+    meal.notes,
+  ].filter(Boolean).join(" - ");
+
+  return {
+    id: meal.id,
+    name: meal.title,
+    detail,
+    calories: meal.calories,
+    iconName: mealTypeIcon(meal.mealType),
+  };
+};
+
+const macroTotalFor = (meals: NutritionLogEntry[], id: string): number => {
+  if (id === "protein") {
+    return Math.round(meals.reduce((sum, meal) => sum + (meal.protein ?? 0), 0));
+  }
+
+  if (id === "carbs") {
+    return Math.round(meals.reduce((sum, meal) => sum + (meal.carbs ?? 0), 0));
+  }
+
+  if (id === "fat") {
+    return Math.round(meals.reduce((sum, meal) => sum + (meal.fat ?? 0), 0));
+  }
+
+  return 0;
+};
+
+const buildLocalMacros = (baseMacros: MacroNutrient[], meals: NutritionLogEntry[]): MacroNutrient[] =>
+  baseMacros.map((macro) => {
+    const consumed = macroTotalFor(meals, macro.id);
+    const percent = macro.goal > 0 ? clampPercent(Math.round((consumed / macro.goal) * 100)) : 0;
+
+    return {
+      ...macro,
+      consumed,
+      percent,
+    };
+  });
+
+const getScoreLabel = (score: number): string => {
+  if (score >= 85) return "Excellent";
+  if (score >= 70) return "Good";
+  if (score >= 45) return "Building";
+
+  return "Needs Logging";
+};
+
+const buildLocalInsights = (
+  baseInsights: NutritionInsight[],
+  caloriesConsumed: number,
+  calorieGoal: number,
+  hydrationMl: number,
+  hydrationGoalMl: number,
+  protein?: MacroNutrient,
+): NutritionInsight[] =>
+  baseInsights.map((insight) => {
+    if (insight.id === "calories") {
+      const remaining = Math.max(0, calorieGoal - caloriesConsumed);
+
+      return {
+        ...insight,
+        status: caloriesConsumed > calorieGoal ? "Over Goal" : "On Track",
+        detail: caloriesConsumed > calorieGoal
+          ? `${caloriesConsumed - calorieGoal} kcal above today's target.`
+          : `${remaining} kcal remaining today.`,
+      };
+    }
+
+    if (insight.id === "hydration") {
+      const remainingMl = Math.max(0, hydrationGoalMl - hydrationMl);
+
+      return {
+        ...insight,
+        status: remainingMl === 0 ? "Goal Met" : "Needs Attention",
+        detail: remainingMl === 0
+          ? "Hydration goal reached for today."
+          : `Drink ${remainingMl} ml more water today.`,
+      };
+    }
+
+    if (insight.id === "protein" && protein) {
+      return {
+        ...insight,
+        status: protein.percent >= 80 ? "Good" : "Building",
+        detail: `${protein.consumed}${protein.unit} logged against ${protein.goal}${protein.unit} goal.`,
+      };
+    }
+
+    return insight;
+  });
+
 export default function NutritionScreen() {
   const [selectedTab, setSelectedTab] = useState<NutritionTab>("Personalized Plan");
   const [segmentWidth, setSegmentWidth] = useState(0);
+  const [mealForm, setMealForm] = useState<MealFormState>(emptyMealForm);
+  const [editingMeal, setEditingMeal] = useState<NutritionLogEntry | null>(null);
+  const [mealModalVisible, setMealModalVisible] = useState(false);
   const indicatorOffset = useRef(new Animated.Value(0)).current;
   const { data, error, loading } = useHealthData();
   const nutrition = data.nutrition;
+  const hydrateNutrition = useNutritionStore((state) => state.hydrate);
+  const localMeals = useNutritionStore((state) => state.meals);
+  const hydration = useNutritionStore((state) => state.hydration);
+  const localNutritionHydrated = useNutritionStore((state) => state.hydrated);
+  const addMeal = useNutritionStore((state) => state.addMeal);
+  const updateMeal = useNutritionStore((state) => state.updateMeal);
+  const deleteMeal = useNutritionStore((state) => state.deleteMeal);
+  const addWater = useNutritionStore((state) => state.addWater);
   const selectedTabIndex = nutritionTabs.indexOf(selectedTab);
+  const todayKey = getLocalDateKey();
+  const todayMeals = useMemo(
+    () => localMeals
+      .filter((meal) => meal.dateKey === todayKey)
+      .sort((left, right) => right.loggedAt.localeCompare(left.loggedAt)),
+    [localMeals, todayKey],
+  );
+  const hydrationMl = useMemo(
+    () => hydration
+      .filter((entry) => entry.dateKey === todayKey)
+      .reduce((sum, entry) => sum + entry.amountMl, 0),
+    [hydration, todayKey],
+  );
 
   useEffect(() => {
     Animated.spring(indicatorOffset, {
@@ -54,6 +245,10 @@ export default function NutritionScreen() {
       useNativeDriver: Platform.OS !== "web",
     }).start();
   }, [indicatorOffset, segmentWidth, selectedTabIndex]);
+
+  useEffect(() => {
+    void hydrateNutrition();
+  }, [hydrateNutrition]);
 
   if (!nutrition) {
     return (
@@ -87,20 +282,130 @@ export default function NutritionScreen() {
     );
   }
 
-  const { summary } = nutrition;
-  const calorieProgress = Math.round((summary.caloriesConsumed / summary.calorieGoal) * 100);
-  const waterProgress = Math.round((summary.waterGlasses / summary.waterGoal) * 100);
-  const protein = getMacro(nutrition.macros, "protein");
-  const carbs = getMacro(nutrition.macros, "carbs");
-  const fat = getMacro(nutrition.macros, "fat");
+  const calorieGoal = nutrition.summary.calorieGoal;
+  const waterGoal = nutrition.summary.waterGoal;
+  const hydrationGoalMl = waterGoal * 250;
+  const caloriesConsumed = todayMeals.reduce((sum, meal) => sum + meal.calories, 0);
+  const localMacros = buildLocalMacros(nutrition.macros, todayMeals);
+  const waterGlasses = Math.round((hydrationMl / 250) * 10) / 10;
+  const calorieProgress = calorieGoal > 0 ? clampPercent(Math.round((caloriesConsumed / calorieGoal) * 100)) : 0;
+  const waterProgress = hydrationGoalMl > 0 ? clampPercent(Math.round((hydrationMl / hydrationGoalMl) * 100)) : 0;
+  const score = Math.round((calorieProgress * 0.62) + (waterProgress * 0.38));
+  const summary = {
+    ...nutrition.summary,
+    score,
+    scoreLabel: getScoreLabel(score),
+    caloriesConsumed,
+    caloriesRemaining: Math.max(0, calorieGoal - caloriesConsumed),
+    waterGlasses,
+    waterGoal,
+    waterGoalAchieved: hydrationMl >= hydrationGoalMl,
+  };
+  const localNutrition = {
+    ...nutrition,
+    summary,
+    macros: localMacros,
+    meals: todayMeals.map(loggedMealToCardMeal),
+    insights: buildLocalInsights(
+      nutrition.insights,
+      caloriesConsumed,
+      calorieGoal,
+      hydrationMl,
+      hydrationGoalMl,
+      getMacro(localMacros, "protein"),
+    ),
+  };
+  const protein = getMacro(localNutrition.macros, "protein");
+  const carbs = getMacro(localNutrition.macros, "carbs");
+  const fat = getMacro(localNutrition.macros, "fat");
   const macroRows = [protein, carbs, fat].filter((macro): macro is MacroNutrient => Boolean(macro));
   const calorieTone = getNutritionInsightToneColors("calories", "Calories", "primary");
   const waterTone = getNutritionInsightToneColors("hydration", "Hydration", "warning");
   const onTabsLayout = (event: LayoutChangeEvent): void => {
     setSegmentWidth(event.nativeEvent.layout.width / nutritionTabs.length);
   };
+
+  const openAddMeal = () => {
+    setEditingMeal(null);
+    setMealForm(emptyMealForm);
+    setMealModalVisible(true);
+  };
+
+  const openEditMeal = (meal: NutritionLogEntry) => {
+    setEditingMeal(meal);
+    setMealForm(formFromMeal(meal));
+    setMealModalVisible(true);
+  };
+
+  const closeMealModal = () => {
+    setMealModalVisible(false);
+    setEditingMeal(null);
+    setMealForm(emptyMealForm);
+  };
+
+  const handleSaveMeal = async () => {
+    const title = mealForm.title.trim();
+    const calories = parseRequiredAmount(mealForm.calories);
+
+    if (!title) {
+      Alert.alert("Meal name needed", "Add a meal name before saving.");
+      return;
+    }
+
+    if (calories === null) {
+      Alert.alert("Calories needed", "Add calories as a number before saving.");
+      return;
+    }
+
+    const mealInput = {
+      mealType: mealForm.mealType,
+      title,
+      calories,
+      protein: parseOptionalAmount(mealForm.protein),
+      carbs: parseOptionalAmount(mealForm.carbs),
+      fat: parseOptionalAmount(mealForm.fat),
+      notes: mealForm.notes,
+    };
+
+    if (editingMeal) {
+      await updateMeal(editingMeal.id, mealInput);
+      Alert.alert("Meal updated", `${title} has been updated.`);
+    } else {
+      await addMeal(mealInput);
+      Alert.alert("Meal logged", `${title} has been added to today's nutrition.`);
+    }
+
+    closeMealModal();
+  };
+
+  const handleDeleteMeal = (meal: NutritionLogEntry) => {
+    Alert.alert("Delete meal", `Remove ${meal.title} from today's log?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          void deleteMeal(meal.id).then(() => {
+            Alert.alert("Meal deleted", `${meal.title} was removed.`);
+          });
+        },
+      },
+    ]);
+  };
+
+  const handleAddWater = (amountMl: number) => {
+    void addWater(amountMl).then(() => {
+      Alert.alert("Hydration updated", `${amountMl} ml water added for today.`);
+    });
+  };
+
   const handleNutritionAction = (title: string) => {
-    Alert.alert(title, "This nutrition action is ready for the next connected workflow.");
+    if (title.toLowerCase().includes("log meal")) {
+      openAddMeal();
+      return;
+    }
+
+    Alert.alert(title, "This nutrition action is planned for a later connected workflow.");
   };
 
   return (
@@ -233,9 +538,9 @@ export default function NutritionScreen() {
               </CustomCard>
 
               <DashboardSection title="Macronutrients" />
-              {nutrition.macros.length > 0 ? (
+              {localNutrition.macros.length > 0 ? (
                 <View style={styles.macroGrid}>
-                  {nutrition.macros.map((macro) => (
+                  {localNutrition.macros.map((macro) => (
                     <MacroCard key={macro.id} macro={macro} />
                   ))}
                 </View>
@@ -257,7 +562,7 @@ export default function NutritionScreen() {
                 <View style={styles.waterContent}>
                   <Text numberOfLines={2} style={styles.cardTitle}>Water Intake</Text>
                   <Text style={styles.waterValue}>
-                    {summary.waterGlasses} / {summary.waterGoal} Glasses
+                    {hydrationMl} ml ({summary.waterGlasses} / {summary.waterGoal} glasses)
                   </Text>
                   <View style={styles.progressTrack}>
                     <View
@@ -273,6 +578,28 @@ export default function NutritionScreen() {
                   <Text style={styles.goalText}>
                     Goal Achieved: {summary.waterGoalAchieved ? "Yes" : "No"}
                   </Text>
+                  <View style={styles.hydrationActions}>
+                    <TouchableOpacity
+                      accessibilityLabel="Add 250 milliliters water"
+                      accessibilityRole="button"
+                      activeOpacity={0.82}
+                      onPress={() => handleAddWater(250)}
+                      style={[styles.hydrationButton, { backgroundColor: waterTone.background }]}
+                    >
+                      <Ionicons color={waterTone.foreground} name="add" size={16} />
+                      <Text style={[styles.hydrationButtonText, { color: waterTone.foreground }]}>250 ml</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      accessibilityLabel="Add 500 milliliters water"
+                      accessibilityRole="button"
+                      activeOpacity={0.82}
+                      onPress={() => handleAddWater(500)}
+                      style={[styles.hydrationButton, { backgroundColor: waterTone.background }]}
+                    >
+                      <Ionicons color={waterTone.foreground} name="add" size={16} />
+                      <Text style={[styles.hydrationButtonText, { color: waterTone.foreground }]}>500 ml</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <ProgressRing
                   backgroundColor={waterTone.background}
@@ -282,27 +609,37 @@ export default function NutritionScreen() {
                 />
               </CustomCard>
 
-              <DashboardSection title="Today's Meals" />
-              {nutrition.meals.length > 0 ? (
+              <DashboardSection title="Today's Meals" actionLabel="Add" onPress={openAddMeal} />
+              {localNutrition.meals.length > 0 ? (
                 <View style={styles.list}>
-                  {nutrition.meals.map((meal) => (
-                    <NutritionMealCard key={meal.id} meal={meal} />
-                  ))}
+                  {todayMeals.map((meal) => {
+                    const cardMeal = loggedMealToCardMeal(meal);
+
+                    return (
+                      <NutritionMealCard
+                        key={meal.id}
+                        meal={cardMeal}
+                        onDelete={() => handleDeleteMeal(meal)}
+                        onEdit={() => openEditMeal(meal)}
+                      />
+                    );
+                  })}
                 </View>
               ) : (
                 <CustomCard style={styles.emptyCard}>
                   <EmptyState
                     icon="restaurant-outline"
-                    subtitle="Logged meals will appear here."
-                    title="No meals logged"
+                    loading={!localNutritionHydrated}
+                    subtitle="Use Log Meal to add breakfast, lunch, dinner, or snacks for today."
+                    title={localNutritionHydrated ? "No meals logged today" : "Loading meal log"}
                   />
                 </CustomCard>
               )}
 
               <DashboardSection title="Nutrition Insights" />
-              {nutrition.insights.length > 0 ? (
+              {localNutrition.insights.length > 0 ? (
                 <View style={styles.list}>
-                  {nutrition.insights.map((insight) => (
+                  {localNutrition.insights.map((insight) => (
                     <NutritionInsightCard insight={insight} key={insight.id} />
                   ))}
                 </View>
@@ -317,9 +654,9 @@ export default function NutritionScreen() {
               )}
 
               <DashboardSection title="Quick Actions" />
-              {nutrition.actions.length > 0 ? (
+              {localNutrition.actions.length > 0 ? (
                 <View style={styles.actionsGrid}>
-                  {nutrition.actions.map((action) => (
+                  {localNutrition.actions.map((action) => (
                     <NutritionActionCard
                       action={action}
                       key={action.id}
@@ -352,7 +689,7 @@ export default function NutritionScreen() {
                   title="Hydration"
                   tone="accent"
                   toneColorsOverride={waterTone}
-                  value={`${summary.waterGlasses} glasses`}
+                  value={`${hydrationMl} ml`}
                 />
               </View>
             </>
@@ -361,6 +698,147 @@ export default function NutritionScreen() {
           {selectedTab === "Ayurveda" ? <AyurvedaSection /> : null}
           {selectedTab === "Recipes" ? <FoodEducationSection /> : null}
         </ScreenSheet>
+
+        <Modal
+          animationType="slide"
+          onRequestClose={closeMealModal}
+          transparent
+          visible={mealModalVisible}
+        >
+          <View style={styles.modalBackdrop}>
+            <CustomCard style={styles.mealFormSheet}>
+              <View style={styles.formHeader}>
+                <View>
+                  <Text style={styles.formTitle}>{editingMeal ? "Edit Meal" : "Log Meal"}</Text>
+                  <Text style={styles.formSubtitle}>Saved locally for {todayKey}</Text>
+                </View>
+                <TouchableOpacity
+                  accessibilityLabel="Close meal form"
+                  accessibilityRole="button"
+                  activeOpacity={0.74}
+                  onPress={closeMealModal}
+                  style={styles.closeButton}
+                >
+                  <Ionicons color={COLORS.text} name="close" size={20} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                contentContainerStyle={styles.formContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={styles.inputLabel}>Meal type</Text>
+                <View style={styles.mealTypeGrid}>
+                  {mealTypeOptions.map((option) => {
+                    const active = mealForm.mealType === option.id;
+
+                    return (
+                      <TouchableOpacity
+                        accessibilityLabel={option.label}
+                        accessibilityRole="button"
+                        activeOpacity={0.82}
+                        key={option.id}
+                        onPress={() => setMealForm((current) => ({ ...current, mealType: option.id }))}
+                        style={[styles.mealTypeButton, active && styles.mealTypeButtonActive]}
+                      >
+                        <Text style={[styles.mealTypeText, active && styles.mealTypeTextActive]}>
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.inputLabel}>Meal name</Text>
+                <TextInput
+                  accessibilityLabel="Meal name"
+                  onChangeText={(title) => setMealForm((current) => ({ ...current, title }))}
+                  placeholder="Paneer rice bowl"
+                  placeholderTextColor={COLORS.textMuted}
+                  style={styles.input}
+                  value={mealForm.title}
+                />
+
+                <Text style={styles.inputLabel}>Calories</Text>
+                <TextInput
+                  accessibilityLabel="Meal calories"
+                  inputMode="numeric"
+                  keyboardType="numeric"
+                  onChangeText={(calories) => setMealForm((current) => ({ ...current, calories }))}
+                  placeholder="520"
+                  placeholderTextColor={COLORS.textMuted}
+                  style={styles.input}
+                  value={mealForm.calories}
+                />
+
+                <View style={styles.nutrientGrid}>
+                  <View style={styles.nutrientInput}>
+                    <Text style={styles.inputLabel}>Protein g</Text>
+                    <TextInput
+                      accessibilityLabel="Protein grams"
+                      inputMode="decimal"
+                      keyboardType="decimal-pad"
+                      onChangeText={(proteinValue) => setMealForm((current) => ({ ...current, protein: proteinValue }))}
+                      placeholder="25"
+                      placeholderTextColor={COLORS.textMuted}
+                      style={styles.input}
+                      value={mealForm.protein}
+                    />
+                  </View>
+                  <View style={styles.nutrientInput}>
+                    <Text style={styles.inputLabel}>Carbs g</Text>
+                    <TextInput
+                      accessibilityLabel="Carbs grams"
+                      inputMode="decimal"
+                      keyboardType="decimal-pad"
+                      onChangeText={(carbsValue) => setMealForm((current) => ({ ...current, carbs: carbsValue }))}
+                      placeholder="60"
+                      placeholderTextColor={COLORS.textMuted}
+                      style={styles.input}
+                      value={mealForm.carbs}
+                    />
+                  </View>
+                  <View style={styles.nutrientInput}>
+                    <Text style={styles.inputLabel}>Fat g</Text>
+                    <TextInput
+                      accessibilityLabel="Fat grams"
+                      inputMode="decimal"
+                      keyboardType="decimal-pad"
+                      onChangeText={(fatValue) => setMealForm((current) => ({ ...current, fat: fatValue }))}
+                      placeholder="18"
+                      placeholderTextColor={COLORS.textMuted}
+                      style={styles.input}
+                      value={mealForm.fat}
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.inputLabel}>Notes</Text>
+                <TextInput
+                  accessibilityLabel="Meal notes"
+                  multiline
+                  onChangeText={(notes) => setMealForm((current) => ({ ...current, notes }))}
+                  placeholder="Optional notes"
+                  placeholderTextColor={COLORS.textMuted}
+                  style={[styles.input, styles.notesInput]}
+                  value={mealForm.notes}
+                />
+
+                <TouchableOpacity
+                  accessibilityLabel={editingMeal ? "Save meal changes" : "Save meal"}
+                  accessibilityRole="button"
+                  activeOpacity={0.86}
+                  onPress={() => void handleSaveMeal()}
+                  style={styles.saveMealButton}
+                >
+                  <Ionicons color={COLORS.white} name="checkmark" size={18} />
+                  <Text style={styles.saveMealText}>{editingMeal ? "Save Changes" : "Log Meal"}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </CustomCard>
+          </View>
+        </Modal>
       </View>
     </ScreenContainer>
   );
@@ -637,6 +1115,24 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.weights.semibold,
     marginTop: SPACING.sm,
   },
+  hydrationActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  hydrationButton: {
+    alignItems: "center",
+    borderRadius: SPACING.lg,
+    flexDirection: "row",
+    gap: SPACING.xs,
+    minHeight: 38,
+    paddingHorizontal: SPACING.md,
+  },
+  hydrationButtonText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.heavy,
+  },
   list: {
     gap: SPACING.md,
   },
@@ -653,5 +1149,117 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: SPACING.md,
     marginTop: SPACING.xl,
+  },
+  modalBackdrop: {
+    backgroundColor: "rgba(20, 13, 53, 0.32)",
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: SPACING.lg,
+  },
+  mealFormSheet: {
+    maxHeight: "88%",
+    padding: SPACING.lg,
+  },
+  formHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  formTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.xl,
+    fontWeight: TYPOGRAPHY.weights.heavy,
+  },
+  formSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    marginTop: SPACING.xs,
+  },
+  closeButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 18,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  formContent: {
+    paddingTop: SPACING.lg,
+  },
+  inputLabel: {
+    color: COLORS.text,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    marginBottom: SPACING.xs,
+    marginTop: SPACING.md,
+  },
+  mealTypeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  mealTypeButton: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderColor: COLORS.border,
+    borderRadius: SPACING.lg,
+    borderWidth: 1,
+    flexGrow: 1,
+    minHeight: 42,
+    minWidth: 118,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.md,
+  },
+  mealTypeButtonActive: {
+    backgroundColor: NUTRITION_COLORS.light,
+    borderColor: NUTRITION_COLORS.secondary,
+  },
+  mealTypeText: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    textAlign: "center",
+  },
+  mealTypeTextActive: {
+    color: NUTRITION_COLORS.dark,
+  },
+  input: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    color: COLORS.text,
+    fontSize: TYPOGRAPHY.sizes.md,
+    minHeight: 48,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  nutrientGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  nutrientInput: {
+    flex: 1,
+    minWidth: 96,
+  },
+  notesInput: {
+    minHeight: 82,
+    textAlignVertical: "top",
+  },
+  saveMealButton: {
+    alignItems: "center",
+    backgroundColor: NUTRITION_COLORS.secondary,
+    borderRadius: 18,
+    flexDirection: "row",
+    gap: SPACING.sm,
+    justifyContent: "center",
+    marginTop: SPACING.lg,
+    minHeight: 52,
+    paddingHorizontal: SPACING.lg,
+  },
+  saveMealText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.heavy,
   },
 });

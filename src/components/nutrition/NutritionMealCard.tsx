@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
@@ -10,9 +10,11 @@ import type { NutritionMeal } from "../../types";
 
 type NutritionMealCardProps = {
   meal: NutritionMeal;
+  onDelete?: () => void;
+  onEdit?: () => void;
 };
 
-export default function NutritionMealCard({ meal }: NutritionMealCardProps) {
+export default function NutritionMealCard({ meal, onDelete, onEdit }: NutritionMealCardProps) {
   const tone = getNutritionMealToneColors(meal.id, meal.name);
 
   return (
@@ -31,6 +33,32 @@ export default function NutritionMealCard({ meal }: NutritionMealCardProps) {
           {meal.calories} kcal
         </Text>
       </View>
+      {onEdit || onDelete ? (
+        <View style={styles.actions}>
+          {onEdit ? (
+            <TouchableOpacity
+              accessibilityLabel={`Edit ${meal.name}`}
+              accessibilityRole="button"
+              activeOpacity={0.74}
+              onPress={onEdit}
+              style={styles.actionButton}
+            >
+              <Ionicons color={COLORS.textMuted} name="create-outline" size={18} />
+            </TouchableOpacity>
+          ) : null}
+          {onDelete ? (
+            <TouchableOpacity
+              accessibilityLabel={`Delete ${meal.name}`}
+              accessibilityRole="button"
+              activeOpacity={0.74}
+              onPress={onDelete}
+              style={styles.actionButton}
+            >
+              <Ionicons color={COLORS.danger} name="trash-outline" size={18} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
     </CustomCard>
   );
 }
@@ -75,5 +103,17 @@ const styles = StyleSheet.create({
   calories: {
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: SPACING.xs,
+  },
+  actionButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 16,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
   },
 });
