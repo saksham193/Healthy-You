@@ -49,7 +49,7 @@ export default function ActivityAnalyticsCard({ summary }: ActivityAnalyticsCard
           size={72}
           value={clampPercent(activeMinutesPercent)}
         />
-        <Text numberOfLines={2} style={styles.metricTitle}>Active Minutes</Text>
+        <Text numberOfLines={2} style={styles.metricTitle}>Device Active Minutes</Text>
         <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.metricValue}>
           {summary.weeklyActivityMinutes} min
         </Text>

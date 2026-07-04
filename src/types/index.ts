@@ -135,6 +135,20 @@ export type WorkoutPlan = {
   tone: Tone;
 };
 
+export type FitnessWorkoutCompletionEntry = {
+  id: string;
+  workoutId: string;
+  workoutName: string;
+  categoryId: string;
+  categoryTitle: string;
+  durationMinutes: number;
+  estimatedCalories: number;
+  difficulty: string;
+  completedAt: string;
+  dateKey: string;
+  notes?: string;
+};
+
 export type ExerciseCategory = {
   id: string;
   title: string;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../../components/common/CustomCard";
@@ -19,14 +19,132 @@ import ScreenSheet from "../../components/layout/ScreenSheet";
 import StatsCard from "../../components/layout/StatsCard";
 import EmptyState from "../../components/layout/EmptyState";
 import { useHealthData } from "../../hooks/useHealthData";
+import { getLocalDateKey, getWeekStartDateKey, useFitnessStore } from "../../store/fitnessStore";
 import { COLORS, FITNESS_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
+import type { ExerciseCategory, FitnessWorkoutCompletionEntry, WorkoutPlan } from "../../types";
 import { getFitnessToneColors } from "../../utils/tone";
 
+type WorkoutTemplate = WorkoutPlan & {
+  categoryId: string;
+  categoryTitle: string;
+  durationMinutes: number;
+  estimatedCalories: number;
+};
+
+const clampPercent = (value: number): number => Math.max(0, Math.min(100, value));
+
+const categoryIdForWorkout = (workout: WorkoutPlan): string => {
+  if (workout.id.includes("strength")) return "strength-training";
+  if (workout.id.includes("cardio")) return "cardio";
+  if (workout.id.includes("yoga")) return "yoga";
+  if (workout.id.includes("mobility") || workout.id.includes("warmup")) return "mobility";
+
+  return "strength-training";
+};
+
+const durationMinutesFor = (duration: string): number => {
+  const parsed = Number.parseInt(duration, 10);
+
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const caloriesPerMinuteFor = (difficulty: string): number => {
+  const normalized = difficulty.toLowerCase();
+
+  if (normalized.includes("easy")) return 5;
+  if (normalized.includes("medium")) return 7;
+  if (normalized.includes("moderate")) return 8;
+
+  return 6;
+};
+
+const templateForWorkout = (
+  workout: WorkoutPlan,
+  categories: ExerciseCategory[],
+): WorkoutTemplate => {
+  const categoryId = categoryIdForWorkout(workout);
+  const category = categories.find((item) => item.id === categoryId) ?? categories[0];
+  const durationMinutes = durationMinutesFor(workout.duration);
+
+  return {
+    ...workout,
+    categoryId: category?.id ?? categoryId,
+    categoryTitle: category?.title ?? "Workout",
+    durationMinutes,
+    estimatedCalories: durationMinutes * caloriesPerMinuteFor(workout.difficulty),
+  };
+};
+
+const completedTimeLabel = (completedAt: string): string => {
+  const date = new Date(completedAt);
+
+  if (Number.isNaN(date.getTime())) return "Today";
+
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+};
+
 export default function FitnessScreen() {
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const { data, error, loading } = useHealthData();
   const fitness = data.fitness;
+  const hydrateFitness = useFitnessStore((state) => state.hydrate);
+  const completions = useFitnessStore((state) => state.completions);
+  const fitnessHydrated = useFitnessStore((state) => state.hydrated);
+  const completeWorkout = useFitnessStore((state) => state.completeWorkout);
+  const deleteCompletion = useFitnessStore((state) => state.deleteCompletion);
+
+  useEffect(() => {
+    void hydrateFitness();
+  }, [hydrateFitness]);
+
+  const todayKey = getLocalDateKey();
+  const weekStartKey = getWeekStartDateKey();
+  const workoutTemplates = useMemo(
+    () => fitness?.workoutPlans.map((workout) =>
+      templateForWorkout(workout, fitness.exerciseCategories),
+    ) ?? [],
+    [fitness],
+  );
+  const todayCompletions = useMemo(
+    () => completions.filter((completion) => completion.dateKey === todayKey),
+    [completions, todayKey],
+  );
+  const weekCompletions = useMemo(
+    () => completions.filter((completion) =>
+      completion.dateKey >= weekStartKey && completion.dateKey <= todayKey,
+    ),
+    [completions, todayKey, weekStartKey],
+  );
+  const todayCompletionByWorkoutId = useMemo(() => {
+    const byWorkout = new Map<string, FitnessWorkoutCompletionEntry>();
+
+    todayCompletions.forEach((completion) => {
+      if (!byWorkout.has(completion.workoutId)) {
+        byWorkout.set(completion.workoutId, completion);
+      }
+    });
+
+    return byWorkout;
+  }, [todayCompletions]);
+  const filteredWorkoutTemplates = useMemo(
+    () => selectedCategoryId
+      ? workoutTemplates.filter((workout) => workout.categoryId === selectedCategoryId)
+      : workoutTemplates,
+    [selectedCategoryId, workoutTemplates],
+  );
+  const manualActiveMinutesToday = todayCompletions.reduce(
+    (sum, completion) => sum + completion.durationMinutes,
+    0,
+  );
+  const manualCaloriesToday = todayCompletions.reduce(
+    (sum, completion) => sum + completion.estimatedCalories,
+    0,
+  );
+  const manualWorkoutProgress = workoutTemplates.length > 0
+    ? clampPercent(Math.round((todayCompletionByWorkoutId.size / workoutTemplates.length) * 100))
+    : 0;
 
   if (!fitness) {
     return (
@@ -59,17 +177,72 @@ export default function FitnessScreen() {
   }
 
   const { summary } = fitness;
+  const selectedCategory = selectedCategoryId
+    ? fitness.exerciseCategories.find((category) => category.id === selectedCategoryId)
+    : undefined;
+  const categoryWorkoutCounts = workoutTemplates.reduce<Record<string, number>>((counts, workout) => {
+    counts[workout.categoryId] = (counts[workout.categoryId] ?? 0) + 1;
+    return counts;
+  }, {});
+  const categoryWeeklyCompletionCounts = weekCompletions.reduce<Record<string, number>>((counts, completion) => {
+    counts[completion.categoryId] = (counts[completion.categoryId] ?? 0) + 1;
+    return counts;
+  }, {});
   const activityLabels = fitness.weeklyActivity.map((point) => point.day);
   const activityValues = fitness.weeklyActivity.map((point) => point.minutes);
   const caloriesProgress = Math.round((summary.caloriesBurned / summary.calorieGoal) * 100);
   const stepCount = summary.steps.toLocaleString("en-US");
   const stepGoal = summary.stepGoal.toLocaleString("en-US");
   const heartRate = data.vitals?.vitalMetrics.find((metric) => metric.id === "heart-rate")?.value;
+  const manualCaloriesRemaining = Math.max(0, summary.calorieGoal - manualCaloriesToday);
+  const manualCaloriesProgress = summary.calorieGoal > 0
+    ? clampPercent(Math.round((manualCaloriesToday / summary.calorieGoal) * 100))
+    : 0;
   const handleFitnessAction = (title: string) => {
-    Alert.alert(title, "This fitness action is ready for the next connected workflow.");
+    if (title.toLowerCase().includes("start") || title.toLowerCase().includes("log")) {
+      Alert.alert("Choose a workout", "Select a category or mark one of today's workout plans complete.");
+      return;
+    }
+
+    Alert.alert(title, "This fitness action is planned for a later connected workflow.");
   };
   const handleWorkoutTimer = () => {
     Alert.alert("Workout Timer", "Timer controls are ready for your next workout session.");
+  };
+  const handleCategoryPress = (categoryId: string) => {
+    setSelectedCategoryId((current) => current === categoryId ? null : categoryId);
+  };
+  const handleCompleteWorkout = (workout: WorkoutTemplate) => {
+    if (todayCompletionByWorkoutId.has(workout.id)) {
+      Alert.alert("Already complete", `${workout.name} is already logged for today.`);
+      return;
+    }
+
+    void completeWorkout({
+      workoutId: workout.id,
+      workoutName: workout.name,
+      categoryId: workout.categoryId,
+      categoryTitle: workout.categoryTitle,
+      durationMinutes: workout.durationMinutes,
+      estimatedCalories: workout.estimatedCalories,
+      difficulty: workout.difficulty,
+    }).then(() => {
+      Alert.alert("Workout complete", `${workout.name} was added to today's fitness log.`);
+    });
+  };
+  const handleUndoWorkout = (completion: FitnessWorkoutCompletionEntry) => {
+    Alert.alert("Undo completion", `Remove ${completion.workoutName} from today's fitness log?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Undo",
+        style: "destructive",
+        onPress: () => {
+          void deleteCompletion(completion.id).then(() => {
+            Alert.alert("Workout removed", `${completion.workoutName} was removed from today's log.`);
+          });
+        },
+      },
+    ]);
   };
 
   return (
@@ -102,6 +275,42 @@ export default function FitnessScreen() {
           <WatchSyncStatusCard activityPercent={summary.stepProgress} heartRate={heartRate} />
           <ActivityAnalyticsCard summary={summary} />
 
+          <DashboardSection title="Manual Workout Summary" />
+          <View style={styles.statsRowCompact}>
+            <StatsCard
+              icon="checkmark-circle-outline"
+              subtitle="manual completions"
+              title="Today"
+              tone="primary"
+              toneColorsOverride={getFitnessToneColors("primary")}
+              value={`${todayCompletionByWorkoutId.size} workouts`}
+            />
+            <StatsCard
+              icon="timer-outline"
+              subtitle="from completed plans"
+              title="Active Minutes"
+              tone="accent"
+              toneColorsOverride={getFitnessToneColors("accent")}
+              value={`${manualActiveMinutesToday} min`}
+            />
+            <StatsCard
+              icon="flame-outline"
+              subtitle="estimated workout burn"
+              title="Manual Burn"
+              tone="warning"
+              toneColorsOverride={getFitnessToneColors("warning")}
+              value={`${manualCaloriesToday} kcal`}
+            />
+            <StatsCard
+              icon="calendar-outline"
+              subtitle="since Monday"
+              title="This Week"
+              tone="primary"
+              toneColorsOverride={getFitnessToneColors("primary")}
+              value={`${weekCompletions.length} done`}
+            />
+          </View>
+
           <DashboardSection title="Weekly Activity" />
           <ActivityChart
             accentColor={FITNESS_COLORS.primary}
@@ -129,6 +338,9 @@ export default function FitnessScreen() {
                   <Text style={styles.metricValue}>{summary.caloriesRemaining} kcal</Text>
                 </View>
               </View>
+              <Text style={styles.muted}>
+                Device and Health Connect activity. Manual workout burn today: {manualCaloriesToday} kcal.
+              </Text>
             </View>
             <ProgressRing
               backgroundColor={FITNESS_COLORS.light}
@@ -146,36 +358,91 @@ export default function FitnessScreen() {
                 backgroundColor={FITNESS_COLORS.light}
                 color={FITNESS_COLORS.primary}
                 max={100}
-                value={summary.workoutProgress}
+                value={manualWorkoutProgress}
               />
               <View style={styles.progressCopy}>
                 <Text numberOfLines={2} style={styles.cardTitle}>Today's Workout Progress</Text>
-                <Text style={styles.progressValue}>{summary.workoutProgress}%</Text>
+                <Text style={styles.progressValue}>{manualWorkoutProgress}%</Text>
                 <Text style={styles.muted}>
-                  {summary.workoutsCompleted} of {summary.workoutsTotal} workouts completed
+                  {todayCompletionByWorkoutId.size} of {workoutTemplates.length} manual plans completed
                 </Text>
               </View>
             </View>
             <View style={styles.progressTrack}>
               <View
-                style={[styles.progressFill, { width: `${summary.workoutProgress}%` }]}
+                style={[styles.progressFill, { width: `${manualWorkoutProgress}%` }]}
               />
             </View>
           </CustomCard>
 
-          <DashboardSection title="Today's Workout Plans" actionLabel="Start" />
-          {fitness.workoutPlans.length > 0 ? (
+          <DashboardSection
+            actionLabel={selectedCategory ? "Clear" : "Start"}
+            onPress={selectedCategory ? () => setSelectedCategoryId(null) : undefined}
+            title="Today's Workout Plans"
+          />
+          {selectedCategory ? (
+            <CustomCard style={styles.filterCard}>
+              <View style={styles.filterIcon}>
+                <Ionicons color={FITNESS_COLORS.primary} name={selectedCategory.iconName} size={18} />
+              </View>
+              <View style={styles.filterCopy}>
+                <Text style={styles.filterTitle}>{selectedCategory.title}</Text>
+                <Text style={styles.muted}>Showing matching workout plans. Tap the category again to clear.</Text>
+              </View>
+            </CustomCard>
+          ) : null}
+          {filteredWorkoutTemplates.length > 0 ? (
             <View style={styles.list}>
-              {fitness.workoutPlans.map((workout) => (
-                <WorkoutPlanCard key={workout.id} workout={workout} />
-              ))}
+              {filteredWorkoutTemplates.map((workout) => {
+                const completion = todayCompletionByWorkoutId.get(workout.id);
+
+                return (
+                  <WorkoutPlanCard
+                    completedAt={completion ? completedTimeLabel(completion.completedAt) : undefined}
+                    isCompletedToday={Boolean(completion)}
+                    key={workout.id}
+                    onComplete={() => handleCompleteWorkout(workout)}
+                    onUndoComplete={completion ? () => handleUndoWorkout(completion) : undefined}
+                    workout={workout}
+                  />
+                );
+              })}
             </View>
           ) : (
             <CustomCard style={styles.emptyCard}>
               <EmptyState
                 icon="barbell-outline"
-                subtitle="Workout plans will appear when your routine is ready."
-                title="No workout plans"
+                subtitle={selectedCategory ? "Try another category or clear the current filter." : "Workout plans will appear when your routine is ready."}
+                title={selectedCategory ? "No matching workout plans" : "No workout plans"}
+              />
+            </CustomCard>
+          )}
+
+          <DashboardSection title="Completed Today" />
+          {todayCompletions.length > 0 ? (
+            <View style={styles.list}>
+              {todayCompletions.map((completion) => (
+                <CustomCard key={completion.id} style={styles.completedLogCard}>
+                  <View style={styles.completedLogIcon}>
+                    <Ionicons color={FITNESS_COLORS.primary} name="checkmark-circle-outline" size={20} />
+                  </View>
+                  <View style={styles.completedLogCopy}>
+                    <Text numberOfLines={1} style={styles.completedLogTitle}>{completion.workoutName}</Text>
+                    <Text style={styles.muted}>
+                      {completion.categoryTitle} - {completion.durationMinutes} min - {completion.estimatedCalories} kcal
+                    </Text>
+                  </View>
+                  <Text style={styles.completedTime}>{completedTimeLabel(completion.completedAt)}</Text>
+                </CustomCard>
+              ))}
+            </View>
+          ) : (
+            <CustomCard style={styles.emptyCard}>
+              <EmptyState
+                icon="checkmark-done-outline"
+                loading={!fitnessHydrated}
+                subtitle="Complete a workout plan to build today's manual fitness log."
+                title={fitnessHydrated ? "No workouts completed today" : "Loading workout log"}
               />
             </CustomCard>
           )}
@@ -239,7 +506,14 @@ export default function FitnessScreen() {
           {fitness.exerciseCategories.length > 0 ? (
             <View style={styles.grid}>
               {fitness.exerciseCategories.map((category) => (
-                <ExerciseCategoryCard category={category} key={category.id} />
+                <ExerciseCategoryCard
+                  category={category}
+                  completedCount={categoryWeeklyCompletionCounts[category.id] ?? 0}
+                  key={category.id}
+                  onPress={() => handleCategoryPress(category.id)}
+                  selected={selectedCategoryId === category.id}
+                  workoutCount={categoryWorkoutCounts[category.id] ?? 0}
+                />
               ))}
             </View>
           ) : (
@@ -307,10 +581,18 @@ export default function FitnessScreen() {
             <StatsCard
               icon="flame-outline"
               subtitle={`${caloriesProgress}% of daily goal`}
-              title="Burn Goal"
+              title="Device Burn"
               tone="warning"
               toneColorsOverride={getFitnessToneColors("primary")}
               value={`${summary.caloriesRemaining} kcal left`}
+            />
+            <StatsCard
+              icon="barbell-outline"
+              subtitle={`${manualCaloriesProgress}% of daily goal`}
+              title="Manual Burn"
+              tone="accent"
+              toneColorsOverride={getFitnessToneColors("accent")}
+              value={`${manualCaloriesRemaining} kcal left`}
             />
             <StatsCard
               icon="footsteps-outline"
@@ -454,8 +736,62 @@ const styles = StyleSheet.create({
   list: {
     gap: SPACING.md,
   },
+  statsRowCompact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.md,
+  },
   emptyCard: {
     padding: 0,
+  },
+  filterCard: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  filterIcon: {
+    alignItems: "center",
+    backgroundColor: FITNESS_COLORS.light,
+    borderRadius: SPACING.lg,
+    height: SPACING.xxxl,
+    justifyContent: "center",
+    width: SPACING.xxxl,
+  },
+  filterCopy: {
+    flex: 1,
+  },
+  filterTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  completedLogCard: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.md,
+  },
+  completedLogIcon: {
+    alignItems: "center",
+    backgroundColor: FITNESS_COLORS.light,
+    borderRadius: SPACING.lg,
+    height: SPACING.xxxl,
+    justifyContent: "center",
+    width: SPACING.xxxl,
+  },
+  completedLogCopy: {
+    flex: 1,
+    minWidth: SPACING.cardMinWidth,
+  },
+  completedLogTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  completedTime: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   bmiCard: {
     gap: SPACING.lg,
