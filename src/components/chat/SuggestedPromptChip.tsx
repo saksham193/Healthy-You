@@ -13,11 +13,13 @@ type SuggestedPromptChipProps = {
 export default function SuggestedPromptChip({ prompt, onPress }: SuggestedPromptChipProps) {
   return (
     <TouchableOpacity
+      accessibilityLabel={prompt.label}
+      accessibilityRole="button"
       activeOpacity={0.82}
       onPress={() => onPress(prompt.label)}
       style={styles.chip}
     >
-      <Text style={styles.label}>{prompt.label}</Text>
+      <Text numberOfLines={2} style={styles.label}>{prompt.label}</Text>
     </TouchableOpacity>
   );
 }
@@ -28,6 +30,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: SPACING.xl,
     borderWidth: 1,
+    minHeight: 44,
+    justifyContent: "center",
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
   },
@@ -35,5 +39,6 @@ const styles = StyleSheet.create({
     color: COLORS.primaryDark,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.sm,
   },
 });

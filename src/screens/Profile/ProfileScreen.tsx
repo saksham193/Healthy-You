@@ -249,13 +249,13 @@ export default function ProfileScreen() {
             <Text style={styles.accountEmail}>{authUser?.email ?? "Signed in on this device"}</Text>
             <View style={styles.syncStatusList}>
               <View style={styles.syncStatusPill}>
-                <Text style={styles.syncStatus}>
+                <Text numberOfLines={2} style={styles.syncStatus}>
                   {profileSyncLabel}
                   {data.queuedProfileUpdateCount > 0 ? ` (${data.queuedProfileUpdateCount})` : ""}
                 </Text>
               </View>
               <View style={styles.syncStatusPill}>
-                <Text style={styles.syncStatus}>
+                <Text numberOfLines={2} style={styles.syncStatus}>
                   {healthBackupLabel}
                   {data.queuedHealthSummaryBackupCount > 0 ? ` (${data.queuedHealthSummaryBackupCount})` : ""}
                 </Text>
@@ -263,6 +263,7 @@ export default function ProfileScreen() {
             </View>
           </View>
           <Pressable
+            accessibilityLabel="Log out"
             accessibilityRole="button"
             disabled={isAuthLoading}
             onPress={handleLogout}
@@ -271,7 +272,7 @@ export default function ProfileScreen() {
               (pressed || isAuthLoading) && styles.logoutButtonPressed,
             ]}
           >
-            <Text style={styles.logoutText}>{isAuthLoading ? "Signing out..." : "Log Out"}</Text>
+            <Text numberOfLines={1} style={styles.logoutText}>{isAuthLoading ? "Signing out..." : "Log Out"}</Text>
           </Pressable>
         </CustomCard>
 
@@ -376,10 +377,11 @@ const styles = StyleSheet.create({
     minWidth: SPACING.cardMinWidth,
   },
   accountCard: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: SPACING.md,
+    gap: SPACING.lg,
+    padding: SPACING.lg,
   },
   accountCopy: {
     flex: 1,
@@ -387,22 +389,27 @@ const styles = StyleSheet.create({
   },
   accountName: {
     color: COLORS.black,
-    fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.bold,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.heavy,
+    lineHeight: TYPOGRAPHY.lineHeights.lg,
   },
   accountEmail: {
     color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: TYPOGRAPHY.lineHeights.sm,
     marginTop: SPACING.xs,
   },
   syncStatusList: {
     alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: SPACING.xs,
-    marginTop: SPACING.sm,
+    marginTop: SPACING.md,
   },
   syncStatusPill: {
     backgroundColor: COLORS.primaryLight,
     borderRadius: SPACING.lg,
+    maxWidth: "100%",
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
   },
@@ -410,12 +417,14 @@ const styles = StyleSheet.create({
     color: COLORS.primaryDark,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: 16,
   },
   logoutButton: {
     alignItems: "center",
     borderColor: COLORS.danger,
     borderRadius: 16,
     borderWidth: 1,
+    alignSelf: "flex-start",
     minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: SPACING.lg,

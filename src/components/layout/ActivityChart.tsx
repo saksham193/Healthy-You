@@ -28,8 +28,8 @@ export default function ActivityChart({
 
   return (
     <CustomCard style={styles.card}>
-      {title ? <Text style={styles.title}>{title}</Text> : null}
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      {title ? <Text numberOfLines={2} style={styles.title}>{title}</Text> : null}
+      {subtitle ? <Text numberOfLines={2} style={styles.subtitle}>{subtitle}</Text> : null}
       <View style={styles.chart}>
         {values.map((value, index) => {
           const height = Math.max(12, (value / max) * 94);
@@ -59,6 +59,7 @@ export default function ActivityChart({
 const styles = StyleSheet.create({
   card: {
     marginTop: SPACING.sm,
+    padding: SPACING.lg,
   },
   title: {
     color: COLORS.black,
@@ -66,8 +67,9 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.weights.heavy,
   },
   subtitle: {
-    color: COLORS.black,
-    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: TYPOGRAPHY.lineHeights.sm,
     marginTop: SPACING.xs / 2,
   },
   chart: {
@@ -101,8 +103,9 @@ const styles = StyleSheet.create({
     width: 14,
   },
   label: {
-    color: COLORS.black,
+    color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.semibold,
     marginTop: SPACING.sm,
   },
 });

@@ -27,7 +27,7 @@ export default function QuickActionChip({ action, onPress }: QuickActionChipProp
         <View style={[styles.iconWrap, { backgroundColor: tone.background }]}>
           <Ionicons color={tone.foreground} name={action.iconName} size={22} />
         </View>
-        <Text style={styles.title}>{action.title}</Text>
+        <Text numberOfLines={2} style={styles.title}>{action.title}</Text>
       </CustomCard>
     </TouchableOpacity>
   );
@@ -36,8 +36,7 @@ export default function QuickActionChip({ action, onPress }: QuickActionChipProp
 const styles = StyleSheet.create({
   card: {
     alignItems: "center",
-    marginRight: SPACING.md,
-    minHeight: SPACING.bottomNavOffset,
+    minHeight: 112,
     padding: SPACING.md,
     width: 132,
   },
@@ -52,6 +51,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.sm,
     marginTop: SPACING.md,
     textAlign: "center",
   },

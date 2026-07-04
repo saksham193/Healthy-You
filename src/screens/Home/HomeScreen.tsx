@@ -1,19 +1,23 @@
 import React from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import FeatureGridCard from "../../components/home/FeatureGridCard";
 import WatchSyncCard from "../../components/home/WatchSyncCard";
+import CustomCard from "../../components/common/CustomCard";
 import ScreenContainer from "../../components/common/ScreenContainer";
 import ActivityChart from "../../components/layout/ActivityChart";
 import AppHeader from "../../components/layout/AppHeader";
 import DashboardSection from "../../components/layout/DashboardSection";
+import ProgressRing from "../../components/layout/ProgressRing";
 import ScreenSheet from "../../components/layout/ScreenSheet";
 import StatsCard from "../../components/layout/StatsCard";
 import EmptyState from "../../components/layout/EmptyState";
 import { useHealthData } from "../../hooks/useHealthData";
 import { COLORS, DATA_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
-import { getDataToneColors, getHomeFeatureToneColors } from "../../utils/tone";
+import { TYPOGRAPHY } from "../../theme/typography";
+import { getHomeFeatureToneColors } from "../../utils/tone";
 import type { RootTabParamList } from "../../types";
 
 type HomeScreenProps = BottomTabScreenProps<RootTabParamList, "Data">;
@@ -90,6 +94,27 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         />
 
         <ScreenSheet>
+          <CustomCard style={styles.healthScoreCard}>
+            <ProgressRing
+              backgroundColor={DATA_COLORS.light}
+              color={DATA_COLORS.dark}
+              max={100}
+              size={92}
+              value={healthScore.score}
+            />
+            <View style={styles.healthScoreCopy}>
+              <Text style={styles.eyebrow}>Today's Health Score</Text>
+              <Text style={styles.healthScoreValue}>{healthScore.score} / 100</Text>
+              <View style={styles.healthScoreMeta}>
+                <View style={styles.healthStatusChip}>
+                  <Ionicons color={DATA_COLORS.ink} name="sparkles-outline" size={14} />
+                  <Text style={styles.healthStatusText}>{healthScore.status}</Text>
+                </View>
+                <Text numberOfLines={2} style={styles.healthChange}>{healthScore.change}</Text>
+              </View>
+            </View>
+          </CustomCard>
+
           <DashboardSection title="Daily Activity Summary" actionLabel="See All" />
 
           <View style={styles.summaryGrid}>
@@ -104,15 +129,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                 value={summary.value}
               />
             ))}
-            <StatsCard
-              icon="pulse-outline"
-              style={styles.summaryCard}
-              subtitle={healthScore.status}
-              title="Health Score"
-              tone="accent"
-              toneColorsOverride={getDataToneColors("accent")}
-              value={`${healthScore.score}`}
-            />
           </View>
 
           <DashboardSection title="Health Dashboard" actionLabel="See All" />
@@ -184,8 +200,59 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   summaryCard: {
-    flexBasis: "47%",
-    minWidth: 150,
+    flexBasis: "48%",
+    minWidth: SPACING.cardMinWidth,
+  },
+  healthScoreCard: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.lg,
+    padding: SPACING.lg,
+  },
+  healthScoreCopy: {
+    flex: 1,
+    minWidth: SPACING.cardMinWidth,
+  },
+  eyebrow: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  healthScoreValue: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    fontWeight: TYPOGRAPHY.weights.heavy,
+    lineHeight: TYPOGRAPHY.lineHeights.xl,
+    marginTop: SPACING.xs,
+  },
+  healthScoreMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  healthStatusChip: {
+    alignItems: "center",
+    backgroundColor: DATA_COLORS.light,
+    borderRadius: SPACING.lg,
+    flexDirection: "row",
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
+  healthStatusText: {
+    color: DATA_COLORS.ink,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  healthChange: {
+    color: COLORS.textMuted,
+    flex: 1,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    minWidth: 88,
   },
   featureGrid: {
     flexDirection: "row",

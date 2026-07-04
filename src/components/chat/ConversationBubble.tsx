@@ -28,7 +28,7 @@ export default function ConversationBubble({ message }: ConversationBubbleProps)
           {[
             message.metadata.fallback ? "Offline fallback" : "Offline response",
             message.metadata.cachedResponseUsed ? "cached" : "",
-          ].filter(Boolean).join(" · ")}
+          ].filter(Boolean).join(" - ")}
         </Text>
       ) : null}
       <Text style={styles.assistantText}>{message.message}</Text>
@@ -42,14 +42,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderBottomRightRadius: SPACING.sm,
     borderRadius: SPACING.xl,
-    maxWidth: "86%",
+    maxWidth: "88%",
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
   },
   assistantBubble: {
     alignSelf: "flex-start",
     borderBottomLeftRadius: SPACING.sm,
-    maxWidth: "90%",
+    maxWidth: "92%",
     padding: SPACING.lg,
   },
   userText: {

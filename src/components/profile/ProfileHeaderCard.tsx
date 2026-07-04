@@ -20,13 +20,13 @@ export default function ProfileHeaderCard({ profile, onEditPress }: ProfileHeade
         <Ionicons color={COLORS.primary} name="person" size={34} />
       </View>
       <View style={styles.content}>
-        <Text style={styles.name}>{profile.name}</Text>
+        <Text numberOfLines={2} style={styles.name}>{profile.name}</Text>
         <View style={styles.metaRow}>
-          <Text style={styles.meta}>{profile.age} Years</Text>
+          <Text numberOfLines={1} style={styles.meta}>{profile.age} Years</Text>
           <View style={styles.divider} />
-          <Text style={styles.meta}>{profile.gender}</Text>
+          <Text numberOfLines={1} style={styles.meta}>{profile.gender}</Text>
           <View style={styles.divider} />
-          <Text style={styles.meta}>{profile.bloodGroup}</Text>
+          <Text numberOfLines={1} style={styles.meta}>{profile.bloodGroup}</Text>
         </View>
       </View>
       <TouchableOpacity
@@ -95,6 +95,7 @@ const styles = StyleSheet.create({
     borderRadius: SPACING.xl,
     flexDirection: "row",
     gap: SPACING.xs,
+    minHeight: 44,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
   },

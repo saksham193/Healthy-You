@@ -27,15 +27,19 @@ export default function ActivityAnalyticsCard({ summary }: ActivityAnalyticsCard
           size={72}
           value={clampPercent(summary.stepProgress)}
         />
-        <Text style={styles.metricTitle}>Steps Ring</Text>
-        <Text style={styles.metricValue}>{summary.steps.toLocaleString("en-US")}</Text>
+        <Text numberOfLines={2} style={styles.metricTitle}>Steps Ring</Text>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.metricValue}>
+          {summary.steps.toLocaleString("en-US")}
+        </Text>
       </View>
       <View style={styles.analyticsCard}>
         <View style={styles.metricIcon}>
           <Ionicons color={COLORS.warning} name="flame-outline" size={24} />
         </View>
-        <Text style={styles.metricTitle}>Calories Burned</Text>
-        <Text style={styles.metricValue}>{summary.caloriesBurned} kcal</Text>
+        <Text numberOfLines={2} style={styles.metricTitle}>Calories Burned</Text>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.metricValue}>
+          {summary.caloriesBurned} kcal
+        </Text>
       </View>
       <View style={styles.analyticsCard}>
         <ProgressRing
@@ -45,8 +49,10 @@ export default function ActivityAnalyticsCard({ summary }: ActivityAnalyticsCard
           size={72}
           value={clampPercent(activeMinutesPercent)}
         />
-        <Text style={styles.metricTitle}>Active Minutes</Text>
-        <Text style={styles.metricValue}>{summary.weeklyActivityMinutes} min</Text>
+        <Text numberOfLines={2} style={styles.metricTitle}>Active Minutes</Text>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.metricValue}>
+          {summary.weeklyActivityMinutes} min
+        </Text>
       </View>
     </CustomCard>
   );
@@ -62,7 +68,7 @@ const styles = StyleSheet.create({
   },
   analyticsCard: {
     alignItems: "center",
-    backgroundColor: COLORS.surfaceMuted,
+    backgroundColor: FITNESS_COLORS.light,
     borderRadius: SPACING.lg,
     flex: 1,
     minWidth: SPACING.cardMinWidth,

@@ -21,10 +21,10 @@ export default function MacroCard({ macro }: MacroCardProps) {
         <View style={[styles.iconWrap, { backgroundColor: tone.background }]}>
           <Ionicons color={tone.foreground} name={macro.iconName} size={20} />
         </View>
-        <Text style={styles.percent}>{macro.percent}%</Text>
+        <Text numberOfLines={1} style={styles.percent}>{macro.percent}%</Text>
       </View>
 
-      <Text style={styles.title}>{macro.name}</Text>
+      <Text numberOfLines={1} style={styles.title}>{macro.name}</Text>
       <Text style={styles.value}>
         {macro.consumed}
         {macro.unit} / {macro.goal}
@@ -69,6 +69,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.heavy,
+    marginLeft: SPACING.sm,
   },
   title: {
     color: COLORS.black,
@@ -79,6 +80,7 @@ const styles = StyleSheet.create({
   value: {
     color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: TYPOGRAPHY.lineHeights.sm,
     marginTop: SPACING.xs,
   },
   track: {

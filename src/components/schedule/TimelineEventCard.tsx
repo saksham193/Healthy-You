@@ -31,7 +31,7 @@ export default function TimelineEventCard({ event, isLast = false }: TimelineEve
   return (
     <View style={styles.row}>
       <View style={styles.timeColumn}>
-        <Text style={styles.time}>{event.time}</Text>
+        <Text numberOfLines={2} style={styles.time}>{event.time}</Text>
       </View>
       <View style={styles.markerColumn}>
         <View style={[styles.marker, { backgroundColor: tone.foreground }]} />
@@ -43,14 +43,14 @@ export default function TimelineEventCard({ event, isLast = false }: TimelineEve
         </View>
         <View style={styles.content}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>{event.title}</Text>
+            <Text numberOfLines={2} style={styles.title}>{event.title}</Text>
             <View style={[styles.status, { backgroundColor: tone.background }]}>
-              <Text style={[styles.statusText, { color: tone.foreground }]}>
+              <Text numberOfLines={1} style={[styles.statusText, { color: tone.foreground }]}>
                 {statusLabel[event.status]}
               </Text>
             </View>
           </View>
-          <Text style={styles.subtitle}>{event.subtitle}</Text>
+          <Text numberOfLines={2} style={styles.subtitle}>{event.subtitle}</Text>
         </View>
       </CustomCard>
     </View>
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     width: 2,
   },
   card: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flex: 1,
     flexDirection: "row",
     gap: SPACING.md,
@@ -120,6 +120,8 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.md,
+    minWidth: 112,
   },
   status: {
     borderRadius: SPACING.lg,

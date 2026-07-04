@@ -20,8 +20,8 @@ export default function ExerciseCategoryCard({ category }: ExerciseCategoryCardP
       <View style={[styles.iconWrap, { backgroundColor: tone.background }]}>
         <Ionicons color={tone.foreground} name={category.iconName} size={22} />
       </View>
-      <Text style={styles.title}>{category.title}</Text>
-      <Text style={styles.description}>{category.description}</Text>
+      <Text numberOfLines={2} style={styles.title}>{category.title}</Text>
+      <Text numberOfLines={3} style={styles.description}>{category.description}</Text>
     </CustomCard>
   );
 }
@@ -31,6 +31,7 @@ const styles = StyleSheet.create({
     flexBasis: "48%",
     flexGrow: 1,
     minWidth: SPACING.cardMinWidth,
+    minHeight: 184,
     padding: SPACING.lg,
   },
   iconWrap: {
@@ -44,6 +45,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.md,
     marginTop: SPACING.md,
   },
   description: {

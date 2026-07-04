@@ -13,9 +13,16 @@ type DashboardSectionProps = {
 export default function DashboardSection({ title, actionLabel, onPress }: DashboardSectionProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+      <Text numberOfLines={2} style={styles.title}>{title}</Text>
       {actionLabel ? (
-        <TouchableOpacity activeOpacity={0.72} disabled={!onPress} onPress={onPress}>
+        <TouchableOpacity
+          accessibilityLabel={actionLabel}
+          accessibilityRole="button"
+          activeOpacity={0.72}
+          disabled={!onPress}
+          onPress={onPress}
+          style={styles.actionButton}
+        >
           <Text style={styles.action}>{actionLabel}</Text>
         </TouchableOpacity>
       ) : null}
@@ -36,6 +43,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.xl,
     fontWeight: TYPOGRAPHY.weights.heavy,
+    lineHeight: TYPOGRAPHY.lineHeights.xl,
+    paddingRight: SPACING.md,
+  },
+  actionButton: {
+    justifyContent: "center",
+    minHeight: 44,
   },
   action: {
     color: COLORS.primaryDark,

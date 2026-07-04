@@ -176,8 +176,8 @@ export default function NutritionScreen() {
                   </View>
                 </View>
                 <View style={styles.dailyIntakeCopy}>
-                  <Text style={styles.cardTitle}>Daily Calorie Intake</Text>
-                  <Text style={styles.dailySubtitle}>{calorieProgress}% of {summary.calorieGoal} kcal goal</Text>
+                  <Text numberOfLines={2} style={styles.cardTitle}>Daily Calorie Intake</Text>
+                  <Text numberOfLines={2} style={styles.dailySubtitle}>{calorieProgress}% of {summary.calorieGoal} kcal goal</Text>
                   <View style={styles.macroSummaryList}>
                     {macroRows.map((macro) => {
                       const macroTone = getNutritionMacroToneColors(macro.id, macro.tone);
@@ -186,9 +186,9 @@ export default function NutritionScreen() {
                         <View key={macro.id} style={styles.macroSummaryRow}>
                           <View style={styles.macroSummaryName}>
                             <View style={[styles.macroDot, { backgroundColor: macroTone.foreground }]} />
-                            <Text style={styles.macroSummaryLabel}>{macro.name}</Text>
+                            <Text numberOfLines={1} style={styles.macroSummaryLabel}>{macro.name}</Text>
                           </View>
-                          <Text style={styles.macroSummaryValue}>
+                          <Text numberOfLines={1} style={styles.macroSummaryValue}>
                             {macro.consumed}{macro.unit}
                           </Text>
                           <Text style={[styles.macroSummaryPercent, { color: macroTone.foreground }]}>
@@ -205,7 +205,9 @@ export default function NutritionScreen() {
               <CustomCard style={styles.calorieCard}>
                 <View style={styles.calorieCopy}>
                   <Text style={styles.cardEyebrow}>Calories Consumed</Text>
-                  <Text style={styles.heroValue}>{summary.caloriesConsumed} kcal</Text>
+                  <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.78} style={styles.heroValue}>
+                    {summary.caloriesConsumed} kcal
+                  </Text>
                   <View style={styles.metricGrid}>
                     <View style={[styles.metricPill, { backgroundColor: calorieTone.background }]}>
                       <Text style={styles.metricLabel}>Goal</Text>
@@ -253,7 +255,7 @@ export default function NutritionScreen() {
                   <Ionicons color={waterTone.foreground} name="water-outline" size={26} />
                 </View>
                 <View style={styles.waterContent}>
-                  <Text style={styles.cardTitle}>Water Intake</Text>
+                  <Text numberOfLines={2} style={styles.cardTitle}>Water Intake</Text>
                   <Text style={styles.waterValue}>
                     {summary.waterGlasses} / {summary.waterGoal} Glasses
                   </Text>
@@ -423,7 +425,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     justifyContent: "center",
-    minHeight: 42,
+    minHeight: 46,
     paddingHorizontal: SPACING.sm,
     zIndex: 1,
   },
@@ -439,6 +441,7 @@ const styles = StyleSheet.create({
   dailyIntakeCard: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: SPACING.lg,
     padding: SPACING.lg,
   },
@@ -483,6 +486,7 @@ const styles = StyleSheet.create({
   },
   dailyIntakeCopy: {
     flex: 1,
+    minWidth: SPACING.cardMinWidth,
   },
   dailySubtitle: {
     color: COLORS.textMuted,
@@ -602,11 +606,13 @@ const styles = StyleSheet.create({
   },
   waterContent: {
     flex: 1,
+    minWidth: SPACING.cardMinWidth,
   },
   cardTitle: {
     color: COLORS.black,
     fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.lg,
   },
   waterValue: {
     color: COLORS.textMuted,

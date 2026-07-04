@@ -39,7 +39,9 @@ export default function InsightCard({
         <View style={styles.titleRow}>
           <Text style={styles.title}>{title}</Text>
           <View style={[styles.chip, { backgroundColor: statusToneColors.background }]}>
-            <Text style={[styles.chipText, { color: statusToneColors.foreground }]}>{status}</Text>
+            <Text numberOfLines={1} style={[styles.chipText, { color: statusToneColors.foreground }]}>
+              {status}
+            </Text>
           </View>
         </View>
         <Text style={styles.detail}>{detail}</Text>
@@ -77,9 +79,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.md,
+    minWidth: 120,
   },
   chip: {
     borderRadius: SPACING.lg,
+    maxWidth: "100%",
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
   },

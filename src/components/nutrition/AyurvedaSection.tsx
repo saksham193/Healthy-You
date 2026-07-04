@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import type { ImageSourcePropType } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
 import DashboardSection from "../layout/DashboardSection";
 import { COLORS, NUTRITION_COLORS } from "../../theme/colors";
+import { SHADOWS } from "../../theme/shadows";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { IconName } from "../../types";
@@ -36,6 +38,40 @@ const doshas: Dosha[] = [
   },
 ];
 
+const DOSHA_VISUALS = {
+  vata: {
+    accent: "#6EAFC0",
+    background: "#EEF9FC",
+    figure: require("../../../assets/ayurveda/dosha-vata-figure.png") as ImageSourcePropType,
+    figureWidth: 36,
+    label: "VATA",
+    symbol: "sync-outline",
+  },
+  pitta: {
+    accent: "#E8632C",
+    background: "#FFF2E8",
+    figure: require("../../../assets/ayurveda/dosha-pitta-figure.png") as ImageSourcePropType,
+    figureWidth: 38,
+    label: "PITTA",
+    symbol: "flame-outline",
+  },
+  kapha: {
+    accent: "#4F8A20",
+    background: "#F1FAEA",
+    figure: require("../../../assets/ayurveda/dosha-kapha-figure.png") as ImageSourcePropType,
+    figureWidth: 44,
+    label: "KAPHA",
+    symbol: "leaf-outline",
+  },
+} satisfies Record<Dosha["id"], {
+  accent: string;
+  background: string;
+  figure: ImageSourcePropType;
+  figureWidth: number;
+  label: string;
+  symbol: IconName;
+}>;
+
 export default function AyurvedaSection() {
   const [selectedDosha, setSelectedDosha] = useState<Dosha["id"]>("pitta");
   const selected = useMemo(
@@ -49,18 +85,48 @@ export default function AyurvedaSection() {
       <View style={styles.doshaRow}>
         {doshas.map((dosha) => {
           const active = dosha.id === selectedDosha;
+          const visual = DOSHA_VISUALS[dosha.id];
 
           return (
             <TouchableOpacity
+              accessibilityLabel={`${dosha.name} dosha body type`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
               activeOpacity={0.82}
               key={dosha.id}
               onPress={() => setSelectedDosha(dosha.id)}
-              style={[styles.doshaCard, active && styles.doshaCardActive]}
+              style={[
+                styles.doshaCard,
+                active && [
+                  styles.doshaCardActive,
+                  {
+                    backgroundColor: visual.background,
+                    borderColor: visual.accent,
+                  },
+                ],
+                active && styles.doshaCardSelectedLift,
+              ]}
             >
-              <View style={[styles.doshaIcon, active && styles.doshaIconActive]}>
-                <Ionicons color={active ? COLORS.white : NUTRITION_COLORS.secondary} name={dosha.iconName} size={30} />
+              <View
+                style={[
+                  styles.doshaSymbolRing,
+                  {
+                    backgroundColor: active ? COLORS.white : visual.background,
+                    borderColor: visual.accent,
+                  },
+                ]}
+              >
+                <Ionicons color={visual.accent} name={visual.symbol} size={31} />
               </View>
-              <Text style={[styles.doshaName, active && styles.doshaNameActive]}>{dosha.name}</Text>
+              <Text style={[styles.doshaName, { color: visual.accent }]}>{visual.label}</Text>
+              <View style={styles.figureSlot} pointerEvents="none">
+                <Image
+                  accessibilityIgnoresInvertColors
+                  resizeMode="contain"
+                  source={visual.figure}
+                  style={[styles.figureImage, { width: visual.figureWidth }]}
+                />
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -83,41 +149,52 @@ export default function AyurvedaSection() {
 const styles = StyleSheet.create({
   doshaRow: {
     flexDirection: "row",
-    gap: SPACING.md,
+    gap: SPACING.sm,
   },
   doshaCard: {
     alignItems: "center",
     backgroundColor: COLORS.surface,
     borderColor: COLORS.border,
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
     flex: 1,
-    minHeight: 118,
-    padding: SPACING.md,
+    justifyContent: "space-between",
+    minHeight: 166,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.md,
+    ...SHADOWS.soft,
   },
   doshaCardActive: {
-    backgroundColor: NUTRITION_COLORS.light,
-    borderColor: NUTRITION_COLORS.secondary,
+    borderWidth: 2,
   },
-  doshaIcon: {
+  doshaCardSelectedLift: {
+    transform: [{ scale: 1.015 }],
+    ...SHADOWS.medium,
+  },
+  doshaSymbolRing: {
     alignItems: "center",
-    backgroundColor: NUTRITION_COLORS.light,
-    borderRadius: 24,
+    borderRadius: 28,
+    borderWidth: 2,
     height: 56,
     justifyContent: "center",
     width: 56,
   },
-  doshaIconActive: {
-    backgroundColor: NUTRITION_COLORS.secondary,
-  },
   doshaName: {
-    color: COLORS.black,
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontWeight: TYPOGRAPHY.weights.bold,
-    marginTop: SPACING.sm,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.heavy,
+    letterSpacing: 0,
+    marginTop: SPACING.xs,
+    textAlign: "center",
   },
-  doshaNameActive: {
-    color: NUTRITION_COLORS.dark,
+  figureSlot: {
+    alignItems: "center",
+    height: 72,
+    justifyContent: "flex-end",
+    marginTop: SPACING.xs,
+    width: "100%",
+  },
+  figureImage: {
+    height: 72,
   },
   summaryCard: {
     alignItems: "center",

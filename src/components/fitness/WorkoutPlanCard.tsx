@@ -24,12 +24,12 @@ export default function WorkoutPlanCard({ workout }: WorkoutPlanCardProps) {
         <Ionicons color={tone.foreground} name={workout.iconName} size={22} />
       </View>
       <View style={styles.content}>
-        <Text style={styles.title}>{workout.name}</Text>
-        <Text style={styles.meta}>{workout.duration}</Text>
+        <Text numberOfLines={1} style={styles.title}>{workout.name}</Text>
+        <Text numberOfLines={1} style={styles.meta}>{workout.duration}</Text>
       </View>
       <View style={styles.trailing}>
         <View style={[styles.badge, { backgroundColor: tone.background }]}>
-          <Text style={[styles.badgeText, { color: tone.foreground }]}>{workout.difficulty}</Text>
+          <Text numberOfLines={1} style={[styles.badgeText, { color: tone.foreground }]}>{workout.difficulty}</Text>
         </View>
         <View style={styles.statusRow}>
           <Ionicons
@@ -37,7 +37,7 @@ export default function WorkoutPlanCard({ workout }: WorkoutPlanCardProps) {
             name={statusIcon}
             size={18}
           />
-          <Text style={styles.statusText}>{statusLabel}</Text>
+          <Text numberOfLines={1} style={styles.statusText}>{statusLabel}</Text>
         </View>
       </View>
     </CustomCard>
@@ -75,8 +75,9 @@ const styles = StyleSheet.create({
   },
   trailing: {
     alignItems: "flex-end",
+    alignSelf: "flex-start",
     gap: SPACING.sm,
-    minWidth: SPACING.cardMinWidth - SPACING.xxl,
+    minWidth: 96,
   },
   statusRow: {
     alignItems: "center",

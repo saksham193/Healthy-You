@@ -39,7 +39,9 @@ export default function StatsCard({
           {title}
         </Text>
       </View>
-      <Text style={styles.value}>{value}</Text>
+      <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.value}>
+        {value}
+      </Text>
       {subtitle ? (
         <Text numberOfLines={2} style={styles.subtitle}>
           {subtitle}
@@ -72,11 +74,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.md,
   },
   value: {
     color: COLORS.black,
     fontSize: TYPOGRAPHY.sizes.xl,
     fontWeight: TYPOGRAPHY.weights.heavy,
+    lineHeight: TYPOGRAPHY.lineHeights.xl,
     marginTop: SPACING.md,
   },
   subtitle: {

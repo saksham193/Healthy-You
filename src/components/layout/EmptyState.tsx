@@ -25,7 +25,11 @@ export default function EmptyState({
   backgroundColor = COLORS.primaryLight,
 }: EmptyStateProps) {
   return (
-    <View style={styles.container}>
+    <View
+      accessibilityLabel={`${title}. ${subtitle}`}
+      accessibilityRole={loading ? "progressbar" : "text"}
+      style={styles.container}
+    >
       <View style={[styles.iconWrap, { backgroundColor }]}>
         {loading ? (
           <ActivityIndicator color={accentColor} size="small" />
@@ -42,7 +46,8 @@ export default function EmptyState({
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    padding: SPACING.xxl,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.xxl,
   },
   iconWrap: {
     alignItems: "center",
@@ -64,6 +69,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.sm,
     lineHeight: TYPOGRAPHY.lineHeights.sm,
     marginTop: SPACING.xs,
+    maxWidth: 320,
     textAlign: "center",
   },
 });

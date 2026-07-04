@@ -52,17 +52,19 @@ export default function WatchSyncCard() {
         />
       </View>
       <View style={styles.content}>
-        <Text style={styles.title}>
+        <Text numberOfLines={2} style={styles.title}>
           {isConnected ? "Device Sync Active" : "Device Sync Inactive"}
         </Text>
         <View style={styles.metrics}>
           <View style={styles.metric}>
             <Ionicons color={COLORS.primaryDark} name={primaryDevice?.iconName ?? "watch-outline"} size={19} />
-            <Text style={styles.metricText}>{syncStatusLabel}</Text>
+            <Text numberOfLines={2} style={styles.metricText}>{syncStatusLabel}</Text>
           </View>
           <View style={styles.metric}>
             <Ionicons color={DATA_COLORS.dark} name="sync-outline" size={18} />
-            <Text style={styles.metricText}>{isSyncing ? "Syncing..." : `${syncTitle} - ${formatSyncTime(primaryDevice?.lastSyncedAt ?? null)}`}</Text>
+            <Text numberOfLines={2} style={styles.metricText}>
+              {isSyncing ? "Syncing..." : `${syncTitle} - ${formatSyncTime(primaryDevice?.lastSyncedAt ?? null)}`}
+            </Text>
           </View>
         </View>
       </View>
@@ -72,7 +74,7 @@ export default function WatchSyncCard() {
 
 const styles = StyleSheet.create({
   card: {
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: COLORS.white,
     borderColor: DATA_COLORS.light,
     borderWidth: 1,
@@ -101,18 +103,22 @@ const styles = StyleSheet.create({
   metrics: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: SPACING.xl,
+    gap: SPACING.md,
     marginTop: SPACING.sm,
   },
   metric: {
     alignItems: "center",
+    backgroundColor: DATA_COLORS.light,
+    borderRadius: SPACING.lg,
     flexDirection: "row",
     gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
   },
   metricText: {
-    color: COLORS.textMuted,
+    color: DATA_COLORS.ink,
     flexShrink: 1,
-    fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.medium,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
 });

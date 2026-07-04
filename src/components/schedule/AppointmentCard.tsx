@@ -21,11 +21,11 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
         <Ionicons color={tone.foreground} name={appointment.iconName} size={22} />
       </View>
       <View style={styles.content}>
-        <Text style={[styles.specialty, { color: tone.foreground }]}>{appointment.specialty}</Text>
-        <Text style={styles.doctor}>{appointment.doctorName}</Text>
+        <Text numberOfLines={1} style={[styles.specialty, { color: tone.foreground }]}>{appointment.specialty}</Text>
+        <Text numberOfLines={1} style={styles.doctor}>{appointment.doctorName}</Text>
         <View style={styles.locationRow}>
           <Ionicons color={COLORS.textMuted} name="location-outline" size={14} />
-          <Text style={styles.location}>{appointment.location}</Text>
+          <Text numberOfLines={2} style={styles.location}>{appointment.location}</Text>
         </View>
       </View>
       <View style={[styles.dateBlock, { backgroundColor: tone.background }]}>
@@ -41,6 +41,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderLeftWidth: 4,
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: SPACING.md,
     padding: SPACING.lg,
   },
@@ -53,6 +54,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minWidth: SPACING.cardMinWidth,
   },
   specialty: {
     color: COLORS.text,
@@ -78,8 +80,10 @@ const styles = StyleSheet.create({
   },
   dateBlock: {
     alignItems: "flex-end",
+    alignSelf: "flex-start",
     borderRadius: SPACING.lg,
     gap: SPACING.xs,
+    minWidth: 88,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
   },

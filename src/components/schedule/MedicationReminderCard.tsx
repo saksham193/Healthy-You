@@ -31,13 +31,13 @@ export default function MedicationReminderCard({ medication }: MedicationReminde
         />
       </View>
       <View style={styles.content}>
-        <Text style={styles.name}>{medication.name}</Text>
-        <Text style={styles.dosage}>{medication.dosage}</Text>
+        <Text numberOfLines={1} style={styles.name}>{medication.name}</Text>
+        <Text numberOfLines={1} style={styles.dosage}>{medication.dosage}</Text>
       </View>
       <View style={styles.meta}>
-        <Text style={styles.time}>{medication.time}</Text>
+        <Text numberOfLines={1} style={styles.time}>{medication.time}</Text>
         <View style={[styles.status, { backgroundColor: tone.background }]}>
-          <Text style={[styles.statusText, { color: tone.foreground }]}>
+          <Text numberOfLines={1} style={[styles.statusText, { color: tone.foreground }]}>
             {isCompleted ? "Completed" : "Pending"}
           </Text>
         </View>
@@ -50,6 +50,7 @@ const styles = StyleSheet.create({
   card: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: SPACING.md,
     padding: SPACING.lg,
   },
@@ -62,6 +63,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minWidth: 132,
   },
   name: {
     color: COLORS.black,
@@ -75,6 +77,7 @@ const styles = StyleSheet.create({
   },
   meta: {
     alignItems: "flex-end",
+    alignSelf: "flex-start",
     gap: SPACING.sm,
   },
   time: {

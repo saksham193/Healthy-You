@@ -21,8 +21,8 @@ export default function HabitTrackerCard({ habit }: HabitTrackerCardProps) {
         <Ionicons color={tone.foreground} name={habit.iconName} size={21} />
       </View>
       <View style={styles.content}>
-        <Text style={styles.title}>{habit.title}</Text>
-        <Text style={styles.streak}>{habit.streak}</Text>
+        <Text numberOfLines={2} style={styles.title}>{habit.title}</Text>
+        <Text numberOfLines={1} style={styles.streak}>{habit.streak}</Text>
       </View>
       <View style={[styles.checkChip, { backgroundColor: habit.completed ? tone.background : COLORS.surfaceMuted }]}>
         <Ionicons
@@ -44,6 +44,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     flexBasis: "48%",
     flexDirection: "row",
+    flexWrap: "wrap",
     flexGrow: 1,
     gap: SPACING.md,
     minWidth: SPACING.cardMinWidth,
@@ -58,6 +59,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minWidth: 92,
   },
   title: {
     color: COLORS.black,
@@ -71,6 +73,7 @@ const styles = StyleSheet.create({
   },
   checkChip: {
     alignItems: "center",
+    alignSelf: "flex-start",
     borderRadius: SPACING.lg,
     flexDirection: "row",
     gap: 3,

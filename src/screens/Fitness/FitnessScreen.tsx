@@ -116,7 +116,9 @@ export default function FitnessScreen() {
           <CustomCard style={styles.heroCard}>
             <View style={styles.heroCopy}>
               <Text style={styles.cardEyebrow}>Calories Burned</Text>
-              <Text style={styles.heroValue}>{summary.caloriesBurned} kcal</Text>
+              <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.78} style={styles.heroValue}>
+                {summary.caloriesBurned} kcal
+              </Text>
               <View style={styles.metricGrid}>
                 <View style={styles.metricPill}>
                   <Text style={styles.metricLabel}>Goal</Text>
@@ -147,7 +149,7 @@ export default function FitnessScreen() {
                 value={summary.workoutProgress}
               />
               <View style={styles.progressCopy}>
-                <Text style={styles.cardTitle}>Today's Workout Progress</Text>
+                <Text numberOfLines={2} style={styles.cardTitle}>Today's Workout Progress</Text>
                 <Text style={styles.progressValue}>{summary.workoutProgress}%</Text>
                 <Text style={styles.muted}>
                   {summary.workoutsCompleted} of {summary.workoutsTotal} workouts completed
@@ -183,7 +185,7 @@ export default function FitnessScreen() {
             <View style={styles.bmiTopRow}>
               <View>
                 <Text style={styles.cardEyebrow}>BMI</Text>
-                <Text style={styles.heroValue}>{summary.bmi}</Text>
+                <Text numberOfLines={1} style={styles.heroValue}>{summary.bmi}</Text>
                 <Text style={styles.scoreStatus}>{summary.bmiStatus}</Text>
               </View>
               <View style={styles.bmiMetrics}>
@@ -219,7 +221,7 @@ export default function FitnessScreen() {
             </View>
             <View style={styles.stepContent}>
               <Text style={styles.cardEyebrow}>Steps</Text>
-              <Text style={styles.heroValue}>{stepCount}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78} style={styles.heroValue}>{stepCount}</Text>
               <Text style={styles.muted}>Goal: {stepGoal}</Text>
               <View style={styles.progressTrack}>
                 <View style={[styles.stepFill, { width: `${summary.stepProgress}%` }]} />
@@ -424,6 +426,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.lg,
   },
   progressValue: {
     color: FITNESS_COLORS.primary,
@@ -467,6 +470,7 @@ const styles = StyleSheet.create({
     backgroundColor: FITNESS_COLORS.light,
     borderRadius: SPACING.lg,
     gap: SPACING.xs,
+    flexGrow: 1,
     minWidth: SPACING.cardMinWidth,
     padding: SPACING.md,
   },

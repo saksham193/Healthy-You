@@ -21,13 +21,15 @@ export default function NutritionMealCard({ meal }: NutritionMealCardProps) {
         <Ionicons color={tone.foreground} name={meal.iconName} size={22} />
       </View>
       <View style={styles.content}>
-        <Text style={styles.title}>{meal.name}</Text>
+        <Text numberOfLines={1} style={styles.title}>{meal.name}</Text>
         <Text numberOfLines={2} style={styles.detail}>
           {meal.detail}
         </Text>
       </View>
       <View style={[styles.calorieChip, { backgroundColor: tone.background }]}>
-        <Text style={[styles.calories, { color: tone.foreground }]}>{meal.calories} kcal</Text>
+        <Text numberOfLines={1} style={[styles.calories, { color: tone.foreground }]}>
+          {meal.calories} kcal
+        </Text>
       </View>
     </CustomCard>
   );
@@ -38,6 +40,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderLeftWidth: 4,
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: SPACING.md,
     padding: SPACING.lg,
   },
@@ -50,6 +53,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minWidth: 132,
   },
   title: {
     color: COLORS.black,
@@ -63,6 +67,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   calorieChip: {
+    alignSelf: "flex-start",
     borderRadius: SPACING.lg,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,

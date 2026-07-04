@@ -38,7 +38,7 @@ export default function ActionCard({
         <View style={[styles.iconWrap, { backgroundColor: toneColors.background }]}>
           <Ionicons color={toneColors.foreground} name={iconName} size={22} />
         </View>
-        <Text style={styles.title}>{title}</Text>
+        <Text numberOfLines={2} style={styles.title}>{title}</Text>
       </CustomCard>
     </TouchableOpacity>
   );
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   },
   card: {
     alignItems: "center",
-    minHeight: SPACING.bottomNavOffset,
+    minHeight: 112,
     padding: SPACING.md,
   },
   iconWrap: {
@@ -66,6 +66,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.sm,
     marginTop: SPACING.md,
     textAlign: "center",
   },

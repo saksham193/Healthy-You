@@ -75,12 +75,12 @@ export default function AppHeader({
         )}
 
         <View style={styles.titleBlock}>
-          <Text numberOfLines={1} style={[styles.title, { color: foregroundColor }]}>
+          <Text numberOfLines={2} style={[styles.title, { color: foregroundColor }]}>
             {title}
           </Text>
           {subtitle ? (
             <Text
-              numberOfLines={1}
+              numberOfLines={2}
               style={[styles.subtitle, theme?.subtitleColor ? { color: theme.subtitleColor } : null]}
             >
               {subtitle}
@@ -175,11 +175,13 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: TYPOGRAPHY.lineHeights.lg,
     textAlign: "center",
   },
   subtitle: {
     color: COLORS.primaryLight,
     fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 16,
     marginTop: SPACING.xs,
     textAlign: "center",
   },

@@ -143,10 +143,10 @@ export default function AssistantScreen() {
               />
             </View>
             <View style={styles.statusCopy}>
-              <Text style={styles.statusTitle}>Medibot status</Text>
+              <Text numberOfLines={1} style={styles.statusTitle}>Medibot status</Text>
               <View style={styles.statusRow}>
                 <View style={[styles.pulseDot, isOffline && styles.offlineDot]} />
-                <Text style={styles.statusText}>{isOffline ? "Offline" : "Online"}</Text>
+                <Text numberOfLines={1} style={styles.statusText}>{isOffline ? "Offline" : "Online"}</Text>
               </View>
             </View>
           </CustomCard>
@@ -403,6 +403,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   quickActions: {
+    gap: SPACING.md,
     paddingRight: SPACING.lg,
   },
   inputBar: {
@@ -421,6 +422,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.md,
+    lineHeight: TYPOGRAPHY.lineHeights.md,
     maxHeight: 108,
     minHeight: 42,
     paddingHorizontal: SPACING.md,
