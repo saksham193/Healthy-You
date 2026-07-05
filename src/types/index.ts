@@ -5,7 +5,7 @@ import type { PredictionSummary } from "../services/prediction/PredictionTypes";
 export type IconName = ComponentProps<typeof Ionicons>["name"];
 
 export type RootTabParamList = {
-  Chat: undefined;
+  Chat: { initialPrompt?: string } | undefined;
   Nutrition: undefined;
   Fitness: undefined;
   Data: undefined;

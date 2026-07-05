@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import CustomCard from "../../components/common/CustomCard";
 import ScreenContainer from "../../components/common/ScreenContainer";
 import AppHeader from "../../components/layout/AppHeader";
@@ -32,11 +33,14 @@ import { getLocalDateKey, useNutritionStore } from "../../store/nutritionStore";
 import { COLORS, NUTRITION_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import type { MacroNutrient, NutritionInsight, NutritionLogEntry, NutritionMeal, NutritionMealType } from "../../types";
+import type { MacroNutrient, NutritionInsight, NutritionLogEntry, NutritionMeal, NutritionMealType, RootTabParamList } from "../../types";
 import { getNutritionInsightToneColors, getNutritionMacroToneColors } from "../../utils/tone";
 
 const nutritionTabs = ["Personalized Plan", "Ayurveda", "Recipes"] as const;
 type NutritionTab = (typeof nutritionTabs)[number];
+type NutritionScreenProps = BottomTabScreenProps<RootTabParamList, "Nutrition">;
+
+const AI_MEAL_PLAN_PROMPT = "Create a simple meal plan for today based on my nutrition goals and today's logged meals. Keep it practical and wellness-focused.";
 
 const getMacro = (macros: MacroNutrient[], id: string): MacroNutrient | undefined =>
   macros.find((macro) => macro.id === id);
@@ -204,7 +208,7 @@ const buildLocalInsights = (
     return insight;
   });
 
-export default function NutritionScreen() {
+export default function NutritionScreen({ navigation }: NutritionScreenProps) {
   const [selectedTab, setSelectedTab] = useState<NutritionTab>("Personalized Plan");
   const [segmentWidth, setSegmentWidth] = useState(0);
   const [mealForm, setMealForm] = useState<MealFormState>(emptyMealForm);
@@ -400,12 +404,34 @@ export default function NutritionScreen() {
   };
 
   const handleNutritionAction = (title: string) => {
-    if (title.toLowerCase().includes("log meal")) {
+    const normalizedTitle = title.toLowerCase();
+
+    if (normalizedTitle.includes("log meal")) {
       openAddMeal();
       return;
     }
 
-    Alert.alert(title, "This nutrition action is planned for a later connected workflow.");
+    if (normalizedTitle.includes("scan")) {
+      Alert.alert(
+        "Food scan coming after beta",
+        "Photo-based food scanning is not enabled in this beta build. You can log this meal manually now.",
+        [
+          { text: "Not now", style: "cancel" },
+          { text: "Log Meal", onPress: openAddMeal },
+        ],
+      );
+      return;
+    }
+
+    if (normalizedTitle.includes("ai meal")) {
+      navigation.navigate("Chat", { initialPrompt: AI_MEAL_PLAN_PROMPT });
+      return;
+    }
+
+    Alert.alert(
+      title,
+      "This nutrition action is not connected in beta yet. Meal logging and hydration tracking are available now.",
+    );
   };
 
   return (

@@ -18,16 +18,16 @@ export default function VoiceAssistantCard({ onNotify }: VoiceAssistantCardProps
       </View>
       <View style={styles.content}>
         <Text style={styles.title}>Voice Assistant</Text>
-        <Text style={styles.description}>Voice mode is queued for your assistant workspace.</Text>
+        <Text style={styles.description}>Voice mode is coming after beta. Type your message to Medibot for now.</Text>
       </View>
       <TouchableOpacity
-        accessibilityLabel="Enable voice alert"
+        accessibilityLabel="Learn about voice mode"
         accessibilityRole="button"
         activeOpacity={0.82}
         onPress={onNotify}
         style={styles.button}
       >
-        <Text style={styles.buttonText}>Enable Alert</Text>
+        <Text style={styles.buttonText}>Learn More</Text>
       </TouchableOpacity>
     </CustomCard>
   );

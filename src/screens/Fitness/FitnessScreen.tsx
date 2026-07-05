@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import CustomCard from "../../components/common/CustomCard";
 import ScreenContainer from "../../components/common/ScreenContainer";
 import ActivityAnalyticsCard from "../../components/fitness/ActivityAnalyticsCard";
@@ -23,7 +24,7 @@ import { getLocalDateKey, getWeekStartDateKey, useFitnessStore } from "../../sto
 import { COLORS, FITNESS_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import type { ExerciseCategory, FitnessWorkoutCompletionEntry, WorkoutPlan } from "../../types";
+import type { ExerciseCategory, FitnessWorkoutCompletionEntry, RootTabParamList, WorkoutPlan } from "../../types";
 import { getFitnessToneColors } from "../../utils/tone";
 
 type WorkoutTemplate = WorkoutPlan & {
@@ -32,6 +33,9 @@ type WorkoutTemplate = WorkoutPlan & {
   durationMinutes: number;
   estimatedCalories: number;
 };
+type FitnessScreenProps = BottomTabScreenProps<RootTabParamList, "Fitness">;
+
+const AI_FITNESS_COACH_PROMPT = "Act as my wellness fitness coach. Suggest a safe workout plan based on my recent activity and completed workouts. Keep it practical and avoid medical claims.";
 
 const clampPercent = (value: number): number => Math.max(0, Math.min(100, value));
 
@@ -85,7 +89,7 @@ const completedTimeLabel = (completedAt: string): string => {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 };
 
-export default function FitnessScreen() {
+export default function FitnessScreen({ navigation }: FitnessScreenProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const { data, error, loading } = useHealthData();
   const fitness = data.fitness;
@@ -199,12 +203,36 @@ export default function FitnessScreen() {
     ? clampPercent(Math.round((manualCaloriesToday / summary.calorieGoal) * 100))
     : 0;
   const handleFitnessAction = (title: string) => {
-    if (title.toLowerCase().includes("start") || title.toLowerCase().includes("log")) {
-      Alert.alert("Choose a workout", "Select a category or mark one of today's workout plans complete.");
+    const normalizedTitle = title.toLowerCase();
+    const firstOpenWorkout = workoutTemplates.find((workout) => !todayCompletionByWorkoutId.has(workout.id));
+
+    if (normalizedTitle.includes("start")) {
+      setSelectedCategoryId(firstOpenWorkout?.categoryId ?? null);
+      Alert.alert(
+        "Workout plans ready",
+        "Choose one of today's workout cards and tap Complete when you finish. A live workout timer is coming after beta.",
+      );
       return;
     }
 
-    Alert.alert(title, "This fitness action is planned for a later connected workflow.");
+    if (normalizedTitle.includes("log")) {
+      setSelectedCategoryId(firstOpenWorkout?.categoryId ?? null);
+      Alert.alert(
+        "Log exercise locally",
+        "Use the visible workout cards to add a completion to your local fitness log. Pick a plan and tap Complete.",
+      );
+      return;
+    }
+
+    if (normalizedTitle.includes("ai fitness")) {
+      navigation.navigate("Chat", { initialPrompt: AI_FITNESS_COACH_PROMPT });
+      return;
+    }
+
+    Alert.alert(
+      title,
+      "This fitness action is not connected in beta yet. Workout completion tracking is available now.",
+    );
   };
   const handleWorkoutTimer = () => {
     Alert.alert("Workout Timer", "Timer controls are ready for your next workout session.");

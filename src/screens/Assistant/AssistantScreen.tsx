@@ -32,7 +32,12 @@ import { COLORS } from "../../theme/colors";
 import { SHADOWS } from "../../theme/shadows";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-export default function AssistantScreen() {
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import type { RootTabParamList } from "../../types";
+
+type AssistantScreenProps = BottomTabScreenProps<RootTabParamList, "Chat">;
+
+export default function AssistantScreen({ route }: AssistantScreenProps) {
   const { data, error, loading: assistantLoading } = useAssistantData();
   const [connectivity, setConnectivity] = useState<ConnectivityStatus>(() => connectivityService.getStatus());
   const initialMessages = useMemo(() => data?.conversation ?? [], [data?.conversation]);
@@ -82,17 +87,33 @@ export default function AssistantScreen() {
     setDraft(`Help me with ${title.toLowerCase()}.`);
   };
   const handleAttachmentPress = () => {
-    Alert.alert("Attachment", "File attachments are not available in this workspace yet.");
+    Alert.alert(
+      "Attachments coming after beta",
+      "For now, type your question or paste text into Medibot. File upload is not enabled in this beta build.",
+    );
   };
   const handleVoicePress = () => {
     showTransientBotState("listening", 1800);
-    Alert.alert("Voice input", "Voice capture is not enabled for this build.");
+    Alert.alert(
+      "Voice input coming after beta",
+      "For now, type your message to Medibot. Microphone capture is not enabled in this beta build.",
+    );
   };
   const handleVoiceNotify = () => {
     showTransientBotState("notification", 1500);
-    Alert.alert("Voice Assistant", "Voice assistant alerts are enabled for your next update.");
+    Alert.alert(
+      "Voice mode coming after beta",
+      "Voice alerts are not enabled in this beta build. Medibot text chat is available now.",
+    );
   };
   const canSend = draft.trim().length > 0 && !medibotLoading;
+
+  useEffect(() => {
+    const initialPrompt = route.params?.initialPrompt?.trim();
+    if (initialPrompt) {
+      setDraft(initialPrompt);
+    }
+  }, [route.params?.initialPrompt]);
 
   useEffect(() => {
     const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
@@ -194,7 +215,7 @@ export default function AssistantScreen() {
                   subtitle={
                     error ??
                     (assistantLoading
-                      ? "Loading your assistant workspace."
+                      ? "Loading your assistant."
                       : "Analyze my sleep, suggest a workout, improve my diet, or explain my blood pressure.")
                   }
                   title={error ? "Unable to load Medibot" : "How can Medibot help today?"}
