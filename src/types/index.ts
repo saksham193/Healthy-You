@@ -256,6 +256,29 @@ export type Habit = {
   tone: Tone;
 };
 
+export type HabitCompletionEntry = {
+  id: string;
+  habitId: string;
+  habitTitle: string;
+  category?: string;
+  completedAt: string;
+  dateKey: string;
+  streakLabel?: string;
+};
+
+export type MedicationLogStatus = "taken" | "skipped";
+
+export type MedicationLogEntry = {
+  id: string;
+  medicationId: string;
+  medicationName: string;
+  dosage?: string;
+  scheduledTime?: string;
+  status: MedicationLogStatus;
+  loggedAt: string;
+  dateKey: string;
+};
+
 export type SleepSchedule = {
   bedtime: string;
   wakeTime: string;

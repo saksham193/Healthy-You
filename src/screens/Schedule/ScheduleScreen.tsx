@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AppointmentCard from "../../components/schedule/AppointmentCard";
@@ -18,15 +18,71 @@ import StatsCard from "../../components/layout/StatsCard";
 import CustomCard from "../../components/common/CustomCard";
 import ScreenContainer from "../../components/common/ScreenContainer";
 import { useHealthData } from "../../hooks/useHealthData";
+import { getLocalDateKey, useScheduleStore } from "../../store/scheduleStore";
 import { COLORS, SCHEDULE_COLORS } from "../../theme/colors";
 import { SHADOWS } from "../../theme/shadows";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import { getScheduleHabitToneColors, getScheduleToneColors } from "../../utils/tone";
+import type { HabitCompletionEntry, MedicationLogEntry } from "../../types";
+
+const clampPercent = (value: number): number => Math.max(0, Math.min(100, value));
+
+const timeLabel = (timestamp: string): string => {
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) return "Today";
+
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+};
 
 export default function ScheduleScreen() {
   const { data, error, loading } = useHealthData();
   const schedule = data.schedule;
+  const hydrateSchedule = useScheduleStore((state) => state.hydrate);
+  const habitCompletions = useScheduleStore((state) => state.habitCompletions);
+  const medicationLogs = useScheduleStore((state) => state.medicationLogs);
+  const scheduleHydrated = useScheduleStore((state) => state.hydrated);
+  const completeHabit = useScheduleStore((state) => state.completeHabit);
+  const uncompleteHabit = useScheduleStore((state) => state.uncompleteHabit);
+  const logMedication = useScheduleStore((state) => state.logMedication);
+  const clearMedicationLog = useScheduleStore((state) => state.clearMedicationLog);
+
+  useEffect(() => {
+    void hydrateSchedule();
+  }, [hydrateSchedule]);
+
+  const todayKey = getLocalDateKey();
+  const todayHabitCompletions = useMemo(
+    () => habitCompletions.filter((completion) => completion.dateKey === todayKey),
+    [habitCompletions, todayKey],
+  );
+  const todayMedicationLogs = useMemo(
+    () => medicationLogs.filter((log) => log.dateKey === todayKey),
+    [medicationLogs, todayKey],
+  );
+  const habitCompletionById = useMemo(() => {
+    const byHabit = new Map<string, HabitCompletionEntry>();
+
+    todayHabitCompletions.forEach((completion) => {
+      if (!byHabit.has(completion.habitId)) {
+        byHabit.set(completion.habitId, completion);
+      }
+    });
+
+    return byHabit;
+  }, [todayHabitCompletions]);
+  const medicationLogById = useMemo(() => {
+    const byMedication = new Map<string, MedicationLogEntry>();
+
+    todayMedicationLogs.forEach((log) => {
+      if (!byMedication.has(log.medicationId)) {
+        byMedication.set(log.medicationId, log);
+      }
+    });
+
+    return byMedication;
+  }, [todayMedicationLogs]);
 
   if (!schedule) {
     return (
@@ -60,11 +116,97 @@ export default function ScheduleScreen() {
   const hydrationRemaining = summary.waterGoal - summary.waterGlasses;
   const priorityReminder = schedule.timelineEvents.find((event) => event.status === "upcoming");
   const waterTone = getScheduleHabitToneColors("drink-water", "Drink Water");
+  const habitsCompletedToday = habitCompletionById.size;
+  const totalHabitsDue = schedule.habits.length;
+  const medicationsTakenToday = todayMedicationLogs.filter((log) => log.status === "taken").length;
+  const medicationsSkippedToday = todayMedicationLogs.filter((log) => log.status === "skipped").length;
+  const totalMedicationsDue = schedule.medications.length;
+  const remainingMedicationsToday = Math.max(
+    0,
+    totalMedicationsDue - medicationsTakenToday - medicationsSkippedToday,
+  );
+  const localTotalTasks = totalHabitsDue + totalMedicationsDue;
+  const localCompletedTasks = habitsCompletedToday + medicationsTakenToday;
+  const localRemainingTasks = Math.max(
+    0,
+    (totalHabitsDue - habitsCompletedToday) + remainingMedicationsToday,
+  );
+  const localCompletionPercent = localTotalTasks > 0
+    ? clampPercent(Math.round((localCompletedTasks / localTotalTasks) * 100))
+    : 0;
   const handleQuickAddWater = () => {
     Alert.alert("Water Tracking", "One glass of water is ready to log when tracking is connected.");
   };
   const handleScheduleAction = (title: string) => {
-    Alert.alert(title, "This action is ready for the next connected workflow.");
+    if (title.toLowerCase().includes("medication")) {
+      Alert.alert("Medication tracking", "Use today's medication cards to mark a reminder taken or skipped. Adding medications is planned next.");
+      return;
+    }
+
+    if (title.toLowerCase().includes("habit")) {
+      Alert.alert("Habit tracking", "Use today's habit cards to mark completion. Creating custom habits is planned next.");
+      return;
+    }
+
+    Alert.alert(title, "This action is planned for a later connected workflow.");
+  };
+  const handleCompleteHabit = (habitId: string) => {
+    const habit = schedule.habits.find((item) => item.id === habitId);
+    if (!habit) return;
+
+    void completeHabit({
+      habitId: habit.id,
+      habitTitle: habit.title,
+      category: habit.tone,
+      streakLabel: habit.streak,
+    }).then(() => {
+      Alert.alert("Habit complete", `${habit.title} was marked complete for today.`);
+    });
+  };
+  const handleUndoHabit = (completion: HabitCompletionEntry) => {
+    Alert.alert("Undo habit", `Mark ${completion.habitTitle} as due again for today?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Undo",
+        style: "destructive",
+        onPress: () => {
+          void uncompleteHabit(completion.habitId).then(() => {
+            Alert.alert("Habit updated", `${completion.habitTitle} is due again today.`);
+          });
+        },
+      },
+    ]);
+  };
+  const handleMedicationStatus = (medicationId: string, status: "taken" | "skipped") => {
+    const medication = schedule.medications.find((item) => item.id === medicationId);
+    if (!medication) return;
+
+    void logMedication({
+      medicationId: medication.id,
+      medicationName: medication.name,
+      dosage: medication.dosage,
+      scheduledTime: medication.time,
+      status,
+    }).then(() => {
+      Alert.alert(
+        status === "taken" ? "Medication taken" : "Medication skipped",
+        `${medication.name} was marked ${status} for today.`,
+      );
+    });
+  };
+  const handleClearMedication = (log: MedicationLogEntry) => {
+    Alert.alert("Clear medication status", `Clear today's status for ${log.medicationName}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear",
+        style: "destructive",
+        onPress: () => {
+          void clearMedicationLog(log.medicationId).then(() => {
+            Alert.alert("Medication updated", `${log.medicationName} is pending again today.`);
+          });
+        },
+      },
+    ]);
   };
 
   return (
@@ -87,12 +229,12 @@ export default function ScheduleScreen() {
             color={SCHEDULE_COLORS.dark}
             max={100}
             size={76}
-            value={summary.completionPercent}
+            value={localCompletionPercent}
           />
           <View style={styles.headerCopy}>
-            <Text style={styles.headerMetric}>{summary.completionPercent}% Complete</Text>
+            <Text style={styles.headerMetric}>{localCompletionPercent}% Complete</Text>
             <Text style={styles.headerText}>
-              {summary.completedTasks} of {summary.totalTasks} health tasks done today
+              {localCompletedTasks} of {localTotalTasks} habit and medication tasks done today
             </Text>
           </View>
         </CustomCard>
@@ -104,17 +246,17 @@ export default function ScheduleScreen() {
             <ProgressRing
               backgroundColor={SCHEDULE_COLORS.light}
               color={SCHEDULE_COLORS.dark}
-              max={summary.totalTasks}
+              max={Math.max(1, localTotalTasks)}
               size={112}
-              value={summary.completedTasks}
+              value={localCompletedTasks}
             />
             <View style={styles.overviewCopy}>
               <Text style={styles.overviewTitle}>Today Overview</Text>
               <Text style={styles.overviewValue}>
-                {summary.completedTasks} / {summary.totalTasks} Completed
+                {localCompletedTasks} / {localTotalTasks} Completed
               </Text>
               <Text style={styles.overviewText}>
-                {summary.remainingTasks} important tasks remaining in your plan.
+                {localRemainingTasks} habit and medication tasks remaining in your plan.
               </Text>
             </View>
           </View>
@@ -125,7 +267,7 @@ export default function ScheduleScreen() {
               title="Completed"
               tone="accent"
               toneColorsOverride={getScheduleToneColors("accent")}
-              value={`${summary.completedTasks}`}
+              value={`${localCompletedTasks}`}
             />
             <StatsCard
               icon="time-outline"
@@ -133,7 +275,7 @@ export default function ScheduleScreen() {
               title="Remaining"
               tone="warning"
               toneColorsOverride={getScheduleToneColors("warning")}
-              value={`${summary.remainingTasks}`}
+              value={`${localRemainingTasks}`}
             />
           </View>
         </CustomCard>
@@ -172,11 +314,49 @@ export default function ScheduleScreen() {
         ) : null}
 
         <DashboardSection title="Medication Reminders" />
+        <View style={styles.statsGrid}>
+          <StatsCard
+            icon="checkmark-circle-outline"
+            subtitle="logged today"
+            title="Taken"
+            tone="accent"
+            toneColorsOverride={getScheduleToneColors("accent")}
+            value={`${medicationsTakenToday}`}
+          />
+          <StatsCard
+            icon="close-circle-outline"
+            subtitle="logged today"
+            title="Skipped"
+            tone="danger"
+            toneColorsOverride={getScheduleToneColors("danger")}
+            value={`${medicationsSkippedToday}`}
+          />
+          <StatsCard
+            icon="time-outline"
+            subtitle="not logged"
+            title="Remaining"
+            tone="warning"
+            toneColorsOverride={getScheduleToneColors("warning")}
+            value={`${remainingMedicationsToday}`}
+          />
+        </View>
         {schedule.medications.length > 0 ? (
-          <View style={styles.list}>
-            {schedule.medications.map((medication) => (
-              <MedicationReminderCard key={medication.id} medication={medication} />
-            ))}
+          <View style={[styles.list, styles.sectionGap]}>
+            {schedule.medications.map((medication) => {
+              const log = medicationLogById.get(medication.id);
+
+              return (
+                <MedicationReminderCard
+                  key={medication.id}
+                  localStatus={log?.status}
+                  loggedAt={log ? timeLabel(log.loggedAt) : undefined}
+                  medication={medication}
+                  onClear={log ? () => handleClearMedication(log) : undefined}
+                  onSkip={() => handleMedicationStatus(medication.id, "skipped")}
+                  onTaken={() => handleMedicationStatus(medication.id, "taken")}
+                />
+              );
+            })}
           </View>
         ) : (
           <CustomCard style={styles.emptyCard}>
@@ -239,11 +419,40 @@ export default function ScheduleScreen() {
         )}
 
         <DashboardSection title="Daily Habits" />
+        <View style={styles.statsGrid}>
+          <StatsCard
+            icon="checkmark-done-outline"
+            subtitle={scheduleHydrated ? "completed today" : "loading log"}
+            title="Habits Done"
+            tone="accent"
+            toneColorsOverride={getScheduleToneColors("accent")}
+            value={`${habitsCompletedToday}`}
+          />
+          <StatsCard
+            icon="list-outline"
+            subtitle="daily templates"
+            title="Due Today"
+            tone="primary"
+            toneColorsOverride={getScheduleToneColors("primary")}
+            value={`${totalHabitsDue}`}
+          />
+        </View>
         {schedule.habits.length > 0 ? (
-          <View style={styles.habitGrid}>
-            {schedule.habits.map((habit) => (
-              <HabitTrackerCard habit={habit} key={habit.id} />
-            ))}
+          <View style={[styles.habitGrid, styles.sectionGap]}>
+            {schedule.habits.map((habit) => {
+              const completion = habitCompletionById.get(habit.id);
+
+              return (
+                <HabitTrackerCard
+                  completedAt={completion ? timeLabel(completion.completedAt) : undefined}
+                  habit={habit}
+                  isCompletedToday={Boolean(completion)}
+                  key={habit.id}
+                  onComplete={() => handleCompleteHabit(habit.id)}
+                  onUndoComplete={completion ? () => handleUndoHabit(completion) : undefined}
+                />
+              );
+            })}
           </View>
         ) : (
           <CustomCard style={styles.emptyCard}>
@@ -351,6 +560,9 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: SPACING.md,
+  },
+  sectionGap: {
+    marginTop: SPACING.md,
   },
   emptyCard: {
     padding: 0,
