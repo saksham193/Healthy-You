@@ -24,6 +24,7 @@ type NutritionStoreState = {
   deleteMeal: (id: string) => Promise<void>;
   addWater: (amountMl?: number) => Promise<HydrationLogEntry>;
   resetTodayHydration: () => Promise<void>;
+  clearAll: () => Promise<void>;
 };
 
 type PersistedNutritionState = {
@@ -182,6 +183,12 @@ export const useNutritionStore = create<NutritionStoreState>((set, get) => ({
     };
 
     set({ hydration: next.hydration, error: null });
+    await savePersistedState(next);
+  },
+  clearAll: async () => {
+    const next = { meals: [], hydration: [] };
+
+    set({ ...next, error: null });
     await savePersistedState(next);
   },
 }));

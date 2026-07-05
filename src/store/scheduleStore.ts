@@ -33,6 +33,7 @@ type ScheduleStoreState = {
   uncompleteHabit: (habitId: string, dateKey?: string) => Promise<void>;
   logMedication: (log: MedicationLogInput) => Promise<MedicationLogEntry>;
   clearMedicationLog: (medicationId: string, dateKey?: string) => Promise<void>;
+  clearAll: () => Promise<void>;
 };
 
 type PersistedScheduleState = {
@@ -211,6 +212,12 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
     };
 
     set({ medicationLogs: next.medicationLogs, error: null });
+    await savePersistedState(next);
+  },
+  clearAll: async () => {
+    const next = { habitCompletions: [], medicationLogs: [] };
+
+    set({ ...next, error: null });
     await savePersistedState(next);
   },
 }));

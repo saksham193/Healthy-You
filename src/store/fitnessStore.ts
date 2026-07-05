@@ -22,6 +22,7 @@ type FitnessStoreState = {
   completeWorkout: (completion: FitnessCompletionInput) => Promise<FitnessWorkoutCompletionEntry>;
   deleteCompletion: (id: string) => Promise<void>;
   deleteTodayWorkoutCompletion: (workoutId: string, dateKey?: string) => Promise<void>;
+  clearAll: () => Promise<void>;
 };
 
 type PersistedFitnessState = {
@@ -150,6 +151,12 @@ export const useFitnessStore = create<FitnessStoreState>((set, get) => ({
         (completion) => completion.workoutId !== workoutId || completion.dateKey !== dateKey,
       ),
     };
+
+    set({ completions: next.completions, error: null });
+    await savePersistedState(next);
+  },
+  clearAll: async () => {
+    const next = { completions: [] };
 
     set({ completions: next.completions, error: null });
     await savePersistedState(next);
