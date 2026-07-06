@@ -68,9 +68,13 @@ Use this checklist for the exact APK artifact that will be shared with closed be
 
 - [ ] Beta tester list prepared.
 - [ ] Distribution channel ready.
+- [ ] Rollout message prepared.
+- [ ] Live beta execution tracker ready.
 - [ ] Feedback channel ready.
 - [ ] Triage owner assigned.
+- [ ] Triage workflow ready.
 - [ ] P0 escalation path defined.
+- [ ] Patch decision template ready.
 - [ ] Post-beta review plan ready.
 - [ ] First-wave tester size selected.
 - [ ] Tester device and Android version tracking prepared.
