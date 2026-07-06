@@ -1,9 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
-import { isHttpError } from "../utils/httpError";
+import { HttpError, isHttpError } from "../utils/httpError";
 import { logger } from "../utils/logger";
 
 export const notFoundHandler = (request: Request, _response: Response, next: NextFunction): void => {
-  next(new Error(`Route not found: ${request.method} ${request.path}`));
+  next(new HttpError(404, "route_not_found", `Route not found: ${request.method} ${request.path}`));
 };
 
 export const errorHandler = (error: unknown, _request: Request, response: Response, _next: NextFunction): void => {
