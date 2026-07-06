@@ -58,6 +58,11 @@ Use this checklist for the exact APK artifact that will be shared with closed be
 - [ ] Feedback template ready.
 - [ ] Safety/privacy notes reviewed.
 - [ ] Deferred features clearly listed.
+- [ ] Distribution guide ready.
+- [ ] Issue tracker template ready.
+- [ ] Monitoring checklist ready.
+- [ ] Feedback summary template ready.
+- [ ] APK SHA256 shared with testers.
 
 ## Tester Operations
 
@@ -67,6 +72,10 @@ Use this checklist for the exact APK artifact that will be shared with closed be
 - [ ] Triage owner assigned.
 - [ ] P0 escalation path defined.
 - [ ] Post-beta review plan ready.
+- [ ] First-wave tester size selected.
+- [ ] Tester device and Android version tracking prepared.
+- [ ] Daily backend monitoring owner assigned.
+- [ ] Patch decision owner assigned.
 
 ## Final Gate
 
