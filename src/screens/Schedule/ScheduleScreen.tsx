@@ -135,20 +135,32 @@ export default function ScheduleScreen() {
     ? clampPercent(Math.round((localCompletedTasks / localTotalTasks) * 100))
     : 0;
   const handleQuickAddWater = () => {
-    Alert.alert("Water Tracking", "One glass of water is ready to log when tracking is connected.");
+    Alert.alert(
+      "Water tracking",
+      "Hydration logging is available in Nutrition for this beta. Use the water buttons there to add 250 ml or 500 ml.",
+    );
   };
   const handleScheduleAction = (title: string) => {
     if (title.toLowerCase().includes("medication")) {
-      Alert.alert("Medication tracking", "Use today's medication cards to mark a reminder taken or skipped. Adding medications is planned next.");
+      Alert.alert(
+        "Medication tracking",
+        "Use today's medication cards to mark a reminder taken or skipped. Custom medication setup is coming after beta.",
+      );
       return;
     }
 
     if (title.toLowerCase().includes("habit")) {
-      Alert.alert("Habit tracking", "Use today's habit cards to mark completion. Creating custom habits is planned next.");
+      Alert.alert(
+        "Habit tracking",
+        "Use today's habit cards to mark completion. Custom habit setup is coming after beta.",
+      );
       return;
     }
 
-    Alert.alert(title, "This action is planned for a later connected workflow.");
+    Alert.alert(
+      title,
+      "Custom schedule creation is coming after beta. For now, use the visible habit and medication cards to track today's local progress.",
+    );
   };
   const handleCompleteHabit = (habitId: string) => {
     const habit = schedule.habits.find((item) => item.id === habitId);

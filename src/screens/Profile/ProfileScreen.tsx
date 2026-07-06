@@ -305,14 +305,18 @@ export default function ProfileScreen() {
       },
       nutrition: {
         meals: nutritionState.meals,
-        hydrationLogs: nutritionState.hydration,
+      },
+      hydration: {
+        logs: nutritionState.hydration,
       },
       fitness: {
         workoutCompletions: fitnessState.completions,
       },
-      schedule: {
-        habitCompletions: scheduleState.habitCompletions,
-        medicationLogs: scheduleState.medicationLogs,
+      habits: {
+        completions: scheduleState.habitCompletions,
+      },
+      medication: {
+        logs: scheduleState.medicationLogs,
       },
       privacyNotes: [
         "Phase 4C nutrition, hydration, workout, habit, and medication logs are local to this device.",
