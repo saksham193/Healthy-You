@@ -116,11 +116,11 @@ node scripts/validate-ai-quality.js
 
 ## Roadmap
 
-- Android release-candidate validation.
-- Physical-device Health Connect QA.
-- Release screenshots and store metadata.
-- Production observability review.
-- Optional live OpenAI quality checks with configured API key.
+- Phase 5A advanced feature technical planning and permission readiness.
+- Phase 5B smart local reminders and notification permission implementation.
+- Phase 5C Food Scan foundation with camera/photo selection and user-confirmed meal logging.
+- Phase 5D advanced Medibot input planning for voice transcription and safe attachments.
+- Phase 5E calendar/device integrations after reminder and media permission flows are stable.
 
 ## Tech Stack
 
