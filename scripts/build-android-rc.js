@@ -44,7 +44,9 @@ const cliArgs = process.argv.slice(2);
 const allArchitectures = cliArgs.includes("--all-architectures");
 const architectureArg = cliArgs.find((arg) => arg.startsWith("--architectures="));
 const requestedArchitectures =
-  architectureArg?.split("=")[1] || process.env.ANDROID_RC_ARCHITECTURES || "x86_64";
+  architectureArg?.split("=")[1] ||
+  process.env.ANDROID_RC_ARCHITECTURES ||
+  "arm64-v8a,x86_64";
 
 const gradleCommand = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
 const gradleArgs = ["assembleRelease"];
