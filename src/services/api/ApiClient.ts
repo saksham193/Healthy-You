@@ -16,6 +16,7 @@ type RefreshResult = "refreshed" | "invalid" | "temporary-failure";
 
 type RequestOptions = {
   authenticated?: boolean;
+  headers?: Record<string, string | undefined>;
   retryOnUnauthorized?: boolean;
   timeoutMs?: number;
 };
@@ -63,6 +64,19 @@ export class ApiClient {
     }, options);
   }
 
+  async postBinary<T>(
+    path: string,
+    body: Blob | ArrayBuffer,
+    contentType: string,
+    options: RequestOptions = {},
+  ): Promise<T> {
+    return this.request<T>(path, {
+      method: "POST",
+      body: body as BodyInit,
+      headers: { "Content-Type": contentType },
+    }, options);
+  }
+
   async put<T>(path: string, body: unknown, options: RequestOptions = {}): Promise<T> {
     return this.request<T>(path, {
       method: "PUT",
@@ -89,7 +103,13 @@ export class ApiClient {
     const tokens = await getStoredTokens();
     const headers = new Headers(init.headers);
 
-    headers.set("Content-Type", "application/json");
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    Object.entries(options.headers ?? {}).forEach(([key, value]) => {
+      if (value) headers.set(key, value);
+    });
 
     if (options.authenticated && tokens?.accessToken) {
       headers.set("Authorization", `Bearer ${tokens.accessToken}`);

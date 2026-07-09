@@ -37,6 +37,12 @@ import {
   scheduleHydrationReminder,
 } from "../../services/notifications/reminderScheduler";
 import {
+  AI_FOOD_ANALYSIS_UNAVAILABLE_MESSAGE,
+  analyzeFoodImageDraft,
+  type NutritionImageAnalysisDraft,
+} from "../../services/api/AIApi";
+import { ApiRequestError } from "../../services/api/ApiClient";
+import {
   captureFoodPhotoWithCamera,
   pickFoodPhotoFromLibrary,
 } from "../../services/media/imagePickerService";
@@ -119,6 +125,42 @@ const formFromMeal = (meal: NutritionLogEntry): MealFormState => ({
   fat: meal.fat === undefined ? "" : `${meal.fat}`,
   notes: meal.notes ?? "",
 });
+
+const nutritionDraftValueToForm = (value: number | null, round = false): string => {
+  if (value === null || !Number.isFinite(value)) return "";
+
+  return `${round ? Math.round(value) : Math.round(value * 10) / 10}`;
+};
+
+const confidenceLabel = (confidence: number): string => `${Math.round(confidence * 100)}% confidence`;
+
+const formFromNutritionAnalysis = (analysis: NutritionImageAnalysisDraft): MealFormState => {
+  const itemNotes = analysis.items.map((item) => {
+    const macros = [
+      item.estimatedCalories === null ? null : `${Math.round(item.estimatedCalories)} cal`,
+      item.protein === null ? null : `${nutritionDraftValueToForm(item.protein)}g protein`,
+      item.carbs === null ? null : `${nutritionDraftValueToForm(item.carbs)}g carbs`,
+      item.fat === null ? null : `${nutritionDraftValueToForm(item.fat)}g fat`,
+    ].filter(Boolean);
+
+    return `${item.name} (${confidenceLabel(item.confidence)}): ${macros.join(", ") || "needs review"}. ${item.notes}`;
+  });
+
+  return {
+    ...emptyMealForm,
+    title: analysis.title || "AI meal draft",
+    calories: nutritionDraftValueToForm(analysis.totals.calories, true),
+    protein: nutritionDraftValueToForm(analysis.totals.protein),
+    carbs: nutritionDraftValueToForm(analysis.totals.carbs),
+    fat: nutritionDraftValueToForm(analysis.totals.fat),
+    notes: [
+      "AI draft for review. Edit before saving.",
+      `Overall ${confidenceLabel(analysis.confidence)}.`,
+      ...analysis.warnings,
+      ...itemNotes,
+    ].join("\n"),
+  };
+};
 
 const loggedMealToCardMeal = (meal: NutritionLogEntry): NutritionMeal => {
   const macros = [
@@ -241,6 +283,8 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
   const [scheduledReminders, setScheduledReminders] = useState<HealthReminderRecord[]>([]);
   const [hydrationReminderBusy, setHydrationReminderBusy] = useState(false);
   const [foodScanDraft, setFoodScanDraft] = useState<FoodScanImageDraft | null>(null);
+  const [activeFoodScanMealDraft, setActiveFoodScanMealDraft] = useState<FoodScanImageDraft | null>(null);
+  const [foodScanAnalysisBusy, setFoodScanAnalysisBusy] = useState(false);
   const selectedTabIndex = nutritionTabs.indexOf(selectedTab);
   const todayKey = getLocalDateKey();
   const todayMeals = useMemo(
@@ -355,14 +399,16 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
     setSegmentWidth(event.nativeEvent.layout.width / nutritionTabs.length);
   };
 
-  const openAddMeal = (preset?: Partial<MealFormState>) => {
+  const openAddMeal = (preset?: Partial<MealFormState>, sourceDraft?: FoodScanImageDraft | null) => {
     setEditingMeal(null);
+    setActiveFoodScanMealDraft(sourceDraft ?? null);
     setMealForm({ ...emptyMealForm, ...preset });
     setMealModalVisible(true);
   };
 
   const openEditMeal = (meal: NutritionLogEntry) => {
     setEditingMeal(meal);
+    setActiveFoodScanMealDraft(null);
     setMealForm(formFromMeal(meal));
     setMealModalVisible(true);
   };
@@ -370,6 +416,7 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
   const closeMealModal = () => {
     setMealModalVisible(false);
     setEditingMeal(null);
+    setActiveFoodScanMealDraft(null);
     setMealForm(emptyMealForm);
   };
 
@@ -455,10 +502,43 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
       notes: [
         "Photo selected for manual review.",
         `Source: ${draft.source === "camera" ? "Camera" : "Photo library"}.`,
-        "AI nutrition recognition is not enabled in this beta build; enter calories and macros yourself.",
+        "Enter calories and macros yourself, or choose Analyze with AI and review every estimate before saving.",
       ].join(" "),
-    });
+    }, draft);
   };
+
+  const analyzeFoodScanDraft = (draft: FoodScanImageDraft) => {
+    Alert.alert(
+      "Analyze with AI",
+      "Healthy You will upload this meal photo to the backend for an editable estimate. It will not save automatically.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Analyze",
+          onPress: () => {
+            setFoodScanAnalysisBusy(true);
+            void analyzeFoodImageDraft(draft)
+              .then((analysis) => {
+                openAddMeal(formFromNutritionAnalysis(analysis), draft);
+                Alert.alert("AI draft ready", "Review and edit the estimate before saving this meal.");
+              })
+              .catch((error: unknown) => {
+                const message = error instanceof ApiRequestError && error.status === 400
+                  ? error.message
+                  : AI_FOOD_ANALYSIS_UNAVAILABLE_MESSAGE;
+
+                Alert.alert("AI analysis unavailable", message, [
+                  { text: "OK", style: "cancel" },
+                  { text: "Log Manually", onPress: () => beginManualLogFromFoodScan(draft) },
+                ]);
+              })
+              .finally(() => setFoodScanAnalysisBusy(false));
+          },
+        },
+      ],
+    );
+  };
+
   const handleFoodScanResult = (result: Awaited<ReturnType<typeof pickFoodPhotoFromLibrary>>) => {
     if (!result.ok) {
       if (result.reason !== "cancelled") {
@@ -470,17 +550,18 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
     setFoodScanDraft(result.asset);
     Alert.alert(
       "Photo captured",
-      "AI nutrition recognition will be added after backend vision validation. Please review and log this meal manually.",
+      "Log it manually, or choose Analyze with AI from the Food Scan draft card and review the estimate before saving.",
       [
         { text: "Later", style: "cancel" },
         { text: "Log Manually", onPress: () => setTimeout(() => beginManualLogFromFoodScan(result.asset), 0) },
+        { text: "Analyze with AI", onPress: () => setTimeout(() => analyzeFoodScanDraft(result.asset), 0) },
       ],
     );
   };
   const handleFoodScan = () => {
     Alert.alert(
       "Food Scan",
-      "Choose a meal photo source. Healthy You will not upload or analyze the image in this beta build.",
+      "Choose a meal photo source. Healthy You will only upload it if you explicitly choose Analyze with AI.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -662,18 +743,37 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
                   <View style={styles.foodScanPreviewCopy}>
                     <Text numberOfLines={1} style={styles.foodScanPreviewTitle}>Food Scan draft</Text>
                     <Text style={styles.foodScanPreviewText}>
-                      Photo captured locally. AI recognition is deferred until backend vision validation.
+                      Photo captured locally. Analyze only by choice, then review every estimate before saving.
                     </Text>
-                    <TouchableOpacity
-                      accessibilityLabel="Log scanned meal manually"
-                      accessibilityRole="button"
-                      activeOpacity={0.82}
-                      onPress={() => beginManualLogFromFoodScan(foodScanDraft)}
-                      style={styles.foodScanPreviewButton}
-                    >
-                      <Ionicons color={COLORS.white} name="create-outline" size={16} />
-                      <Text style={styles.foodScanPreviewButtonText}>Log Manually</Text>
-                    </TouchableOpacity>
+                    <View style={styles.foodScanPreviewActions}>
+                      <TouchableOpacity
+                        accessibilityLabel="Log scanned meal manually"
+                        accessibilityRole="button"
+                        activeOpacity={0.82}
+                        onPress={() => beginManualLogFromFoodScan(foodScanDraft)}
+                        style={styles.foodScanPreviewButton}
+                      >
+                        <Ionicons color={COLORS.white} name="create-outline" size={16} />
+                        <Text style={styles.foodScanPreviewButtonText}>Log Manually</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        accessibilityLabel="Analyze scanned meal with AI"
+                        accessibilityRole="button"
+                        activeOpacity={0.82}
+                        disabled={foodScanAnalysisBusy}
+                        onPress={() => analyzeFoodScanDraft(foodScanDraft)}
+                        style={[
+                          styles.foodScanPreviewButton,
+                          styles.foodScanAnalyzeButton,
+                          foodScanAnalysisBusy && styles.foodScanPreviewButtonDisabled,
+                        ]}
+                      >
+                        <Ionicons color={NUTRITION_COLORS.secondary} name="sparkles-outline" size={16} />
+                        <Text style={styles.foodScanAnalyzeButtonText}>
+                          {foodScanAnalysisBusy ? "Analyzing" : "Analyze with AI"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </CustomCard>
               ) : null}
@@ -895,6 +995,25 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
                   <Ionicons color={COLORS.text} name="close" size={20} />
                 </TouchableOpacity>
               </View>
+
+              {activeFoodScanMealDraft ? (
+                <TouchableOpacity
+                  accessibilityLabel="Analyze scanned meal with AI"
+                  accessibilityRole="button"
+                  activeOpacity={0.82}
+                  disabled={foodScanAnalysisBusy}
+                  onPress={() => analyzeFoodScanDraft(activeFoodScanMealDraft)}
+                  style={[
+                    styles.foodScanModalAnalyzeButton,
+                    foodScanAnalysisBusy && styles.foodScanPreviewButtonDisabled,
+                  ]}
+                >
+                  <Ionicons color={NUTRITION_COLORS.secondary} name="sparkles-outline" size={18} />
+                  <Text style={styles.foodScanModalAnalyzeText}>
+                    {foodScanAnalysisBusy ? "Analyzing" : "Analyze with AI"}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
 
               <ScrollView
                 contentContainerStyle={styles.formContent}
@@ -1310,6 +1429,11 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.xs,
     lineHeight: 16,
   },
+  foodScanPreviewActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
   foodScanPreviewButton: {
     alignItems: "center",
     alignSelf: "flex-start",
@@ -1320,8 +1444,21 @@ const styles = StyleSheet.create({
     minHeight: 34,
     paddingHorizontal: SPACING.md,
   },
+  foodScanAnalyzeButton: {
+    backgroundColor: COLORS.white,
+    borderColor: NUTRITION_COLORS.secondary,
+    borderWidth: 1,
+  },
+  foodScanPreviewButtonDisabled: {
+    opacity: 0.56,
+  },
   foodScanPreviewButtonText: {
     color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  foodScanAnalyzeButtonText: {
+    color: NUTRITION_COLORS.secondary,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontWeight: TYPOGRAPHY.weights.bold,
   },
@@ -1395,6 +1532,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  foodScanModalAnalyzeButton: {
+    alignItems: "center",
+    alignSelf: "stretch",
+    backgroundColor: COLORS.white,
+    borderColor: NUTRITION_COLORS.secondary,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: SPACING.sm,
+    justifyContent: "center",
+    marginTop: SPACING.md,
+    minHeight: 46,
+    paddingHorizontal: SPACING.lg,
+  },
+  foodScanModalAnalyzeText: {
+    color: NUTRITION_COLORS.secondary,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.heavy,
   },
   formTitle: {
     color: COLORS.black,

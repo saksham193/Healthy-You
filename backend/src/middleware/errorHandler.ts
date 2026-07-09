@@ -17,6 +17,20 @@ export const errorHandler = (error: unknown, _request: Request, response: Respon
     return;
   }
 
+  if (
+    error &&
+    typeof error === "object" &&
+    ((error as { type?: unknown }).type === "entity.too.large" || (error as { status?: unknown }).status === 413)
+  ) {
+    response.status(413).json({
+      error: {
+        code: "payload_too_large",
+        message: "Request payload is too large.",
+      },
+    });
+    return;
+  }
+
   logger.error("unhandled_error", error instanceof Error ? { message: error.message, stack: error.stack } : error);
   response.status(500).json({
     error: {

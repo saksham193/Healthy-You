@@ -109,6 +109,34 @@ export const aiResponseSchema = z.object({
   }).optional(),
 });
 
+const nutritionEstimateSchema = z.number().min(0).max(10000).nullable();
+const nutritionConfidenceSchema = z.number().min(0).max(1);
+
+export const nutritionImageAnalysisItemSchema = z.object({
+  name: z.string().min(1).max(120),
+  confidence: nutritionConfidenceSchema,
+  estimatedCalories: nutritionEstimateSchema,
+  protein: nutritionEstimateSchema,
+  carbs: nutritionEstimateSchema,
+  fat: nutritionEstimateSchema,
+  notes: z.string().max(500),
+}).strict();
+
+export const nutritionImageAnalysisResponseSchema = z.object({
+  analysisId: z.string().min(1).max(160).nullable(),
+  title: z.string().min(1).max(120),
+  items: z.array(nutritionImageAnalysisItemSchema).max(12),
+  totals: z.object({
+    calories: nutritionEstimateSchema,
+    protein: nutritionEstimateSchema,
+    carbs: nutritionEstimateSchema,
+    fat: nutritionEstimateSchema,
+  }).strict(),
+  confidence: nutritionConfidenceSchema,
+  warnings: z.array(z.string().min(1).max(240)).min(1).max(5),
+  requiresReview: z.literal(true),
+}).strict();
+
 export const registerSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1).max(120),
@@ -244,6 +272,7 @@ export const healthSummarySchema = z.object({
 
 export type BackendAIRequest = z.infer<typeof aiRequestSchema>;
 export type BackendAIResponse = z.infer<typeof aiResponseSchema>;
+export type BackendNutritionImageAnalysisResponse = z.infer<typeof nutritionImageAnalysisResponseSchema>;
 export type RegisterBody = z.infer<typeof registerSchema>;
 export type LoginBody = z.infer<typeof loginSchema>;
 export type RefreshTokenBody = z.infer<typeof refreshTokenSchema>;
