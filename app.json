@@ -16,6 +16,9 @@
     "android": {
       "package": "com.healthyyou.app",
       "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_DISTANCE",
         "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
@@ -51,6 +54,31 @@
         }
       ],
       "./plugins/withAndroidSharedStlLinking",
+      [
+        "expo-notifications",
+        {
+          "color": "#20D6D2",
+          "defaultChannel": "health-reminders"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Healthy You to select meal photos for manual food logging.",
+          "cameraPermission": "Allow Healthy You to take meal photos for manual food logging.",
+          "microphonePermission": false
+        }
+      ],
+      "./plugins/withAndroidOptionalCameraFeature",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow Healthy You to add generic wellness events to your calendar.",
+          "writeOnlyCalendarPermission": "Allow Healthy You to add generic wellness events to your calendar.",
+          "writeOnlyAccess": true
+        }
+      ],
+      "expo-document-picker",
       "expo-font"
     ],
     "extra": {

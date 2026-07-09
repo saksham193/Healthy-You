@@ -28,12 +28,15 @@ import { useAssistantData } from "../../hooks/useAssistantData";
 import { useMedibot } from "../../hooks/useMedibot";
 import { connectivityService } from "../../services/connectivity/ConnectivityService";
 import type { ConnectivityStatus } from "../../services/connectivity/ConnectivityStatus";
+import { formatBytes, pickMedibotAttachment } from "../../services/media/documentPickerService";
+import { getVoiceInputFoundationStatus } from "../../services/media/voiceInputFoundation";
 import { COLORS } from "../../theme/colors";
 import { SHADOWS } from "../../theme/shadows";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { RootTabParamList } from "../../types";
+import type { PickedAttachment } from "../../services/media/mediaTypes";
 
 type AssistantScreenProps = BottomTabScreenProps<RootTabParamList, "Chat">;
 
@@ -52,6 +55,7 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
     initialMessages,
   });
   const [draft, setDraft] = useState("");
+  const [selectedAttachment, setSelectedAttachment] = useState<PickedAttachment | null>(null);
   const [transientBotState, setTransientBotState] = useState<MedibotAnimationState | null>(null);
   const transientTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const talkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,17 +91,25 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
     setDraft(`Help me with ${title.toLowerCase()}.`);
   };
   const handleAttachmentPress = () => {
-    Alert.alert(
-      "Attachments coming after beta",
-      "For now, type your question or paste text into Medibot. File upload is not enabled in this beta build.",
-    );
+    void pickMedibotAttachment().then((result) => {
+      if (!result.ok) {
+        if (result.reason !== "cancelled") {
+          Alert.alert("Attachment unavailable", result.message);
+        }
+        return;
+      }
+
+      setSelectedAttachment(result.asset);
+      Alert.alert(
+        "Attachment selected",
+        "Healthy You will not upload or analyze this file in the beta foundation. Paste relevant text into Medibot if you want to discuss it.",
+      );
+    });
   };
   const handleVoicePress = () => {
     showTransientBotState("listening", 1800);
-    Alert.alert(
-      "Voice input coming after beta",
-      "For now, type your message to Medibot. Microphone capture is not enabled in this beta build.",
-    );
+    const status = getVoiceInputFoundationStatus();
+    Alert.alert(status.title, status.message);
   };
   const handleVoiceNotify = () => {
     showTransientBotState("notification", 1500);
@@ -281,6 +293,32 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
             <MedicalDisclaimerCard />
           </ScrollView>
 
+          {selectedAttachment ? (
+            <View style={styles.attachmentBanner}>
+              <View style={styles.attachmentIcon}>
+                <Ionicons color={COLORS.primary} name="document-attach-outline" size={18} />
+              </View>
+              <View style={styles.attachmentCopy}>
+                <Text numberOfLines={1} style={styles.attachmentName}>{selectedAttachment.name}</Text>
+                <Text numberOfLines={1} style={styles.attachmentMeta}>
+                  {selectedAttachment.mimeType} - {formatBytes(selectedAttachment.size)} - not uploaded
+                </Text>
+                <Text numberOfLines={2} style={styles.attachmentSafety}>
+                  Analysis and upload are not enabled yet.
+                </Text>
+              </View>
+              <TouchableOpacity
+                accessibilityLabel="Remove selected attachment"
+                accessibilityRole="button"
+                activeOpacity={0.78}
+                onPress={() => setSelectedAttachment(null)}
+                style={styles.attachmentRemoveButton}
+              >
+                <Ionicons color={COLORS.textMuted} name="close-outline" size={18} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           <View style={styles.inputBar}>
             <TouchableOpacity
               accessibilityLabel="Attach file"
@@ -426,6 +464,53 @@ const styles = StyleSheet.create({
   quickActions: {
     gap: SPACING.md,
     paddingRight: SPACING.lg,
+  },
+  attachmentBanner: {
+    alignItems: "center",
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.border,
+    borderRadius: SPACING.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+    padding: SPACING.sm,
+  },
+  attachmentIcon: {
+    alignItems: "center",
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: SPACING.md,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  attachmentCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  attachmentName: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  attachmentMeta: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    marginTop: SPACING.xs,
+  },
+  attachmentSafety: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 16,
+    marginTop: SPACING.xs,
+  },
+  attachmentRemoveButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: SPACING.md,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
   },
   inputBar: {
     alignItems: "center",

@@ -14,6 +14,7 @@ type HabitTrackerCardProps = {
   isCompletedToday?: boolean;
   onComplete?: () => void;
   onUndoComplete?: () => void;
+  reminderAction?: React.ReactNode;
 };
 
 export default function HabitTrackerCard({
@@ -22,6 +23,7 @@ export default function HabitTrackerCard({
   isCompletedToday,
   onComplete,
   onUndoComplete,
+  reminderAction,
 }: HabitTrackerCardProps) {
   const tone = getScheduleHabitToneColors(habit.id, habit.title);
   const isCompleted = Boolean(isCompletedToday);
@@ -59,6 +61,7 @@ export default function HabitTrackerCard({
           {isCompleted ? "Undo" : "Complete"}
         </Text>
       </TouchableOpacity>
+      {reminderAction}
     </CustomCard>
   );
 }

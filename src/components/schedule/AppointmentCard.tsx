@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomCard from "../common/CustomCard";
 import { COLORS } from "../../theme/colors";
@@ -10,9 +10,10 @@ import type { Appointment } from "../../types";
 
 type AppointmentCardProps = {
   appointment: Appointment;
+  onAddToCalendar?: () => void;
 };
 
-export default function AppointmentCard({ appointment }: AppointmentCardProps) {
+export default function AppointmentCard({ appointment, onAddToCalendar }: AppointmentCardProps) {
   const tone = getScheduleAppointmentToneColors(appointment.id, appointment.specialty);
 
   return (
@@ -32,6 +33,18 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
         <Text style={styles.date}>{appointment.date}</Text>
         <Text style={[styles.time, { color: tone.foreground }]}>{appointment.time}</Text>
       </View>
+      {onAddToCalendar ? (
+        <TouchableOpacity
+          accessibilityLabel="Add appointment to device calendar"
+          accessibilityRole="button"
+          activeOpacity={0.82}
+          onPress={onAddToCalendar}
+          style={[styles.calendarButton, { backgroundColor: tone.foreground }]}
+        >
+          <Ionicons color={COLORS.white} name="calendar-outline" size={15} />
+          <Text style={styles.calendarButtonText}>Add to Calendar</Text>
+        </TouchableOpacity>
+      ) : null}
     </CustomCard>
   );
 }
@@ -96,5 +109,20 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontWeight: TYPOGRAPHY.weights.semibold,
+  },
+  calendarButton: {
+    alignItems: "center",
+    borderRadius: SPACING.lg,
+    flexBasis: "100%",
+    flexDirection: "row",
+    gap: SPACING.xs,
+    justifyContent: "center",
+    minHeight: 34,
+    paddingHorizontal: SPACING.md,
+  },
+  calendarButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
   },
 });

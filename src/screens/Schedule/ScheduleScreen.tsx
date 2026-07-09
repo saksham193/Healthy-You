@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AppointmentCard from "../../components/schedule/AppointmentCard";
@@ -18,13 +18,29 @@ import StatsCard from "../../components/layout/StatsCard";
 import CustomCard from "../../components/common/CustomCard";
 import ScreenContainer from "../../components/common/ScreenContainer";
 import { useHealthData } from "../../hooks/useHealthData";
+import { addAppointmentToDeviceCalendar } from "../../services/calendar/calendarService";
 import { getLocalDateKey, useScheduleStore } from "../../store/scheduleStore";
+import { requestNotificationPermission } from "../../services/notifications/notificationService";
+import {
+  cancelScheduledReminder,
+  getHydrationReminderKey,
+  getReminderKey,
+  getStoredNotificationStatus,
+  listScheduledReminders,
+  scheduleHabitReminder,
+  scheduleHydrationReminder,
+  scheduleMedicationReminder,
+} from "../../services/notifications/reminderScheduler";
 import { COLORS, SCHEDULE_COLORS } from "../../theme/colors";
 import { SHADOWS } from "../../theme/shadows";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import { getScheduleHabitToneColors, getScheduleToneColors } from "../../utils/tone";
-import type { HabitCompletionEntry, MedicationLogEntry } from "../../types";
+import type { Appointment, Habit, HabitCompletionEntry, MedicationLogEntry, MedicationReminder } from "../../types";
+import type {
+  HealthReminderRecord,
+  NotificationPermissionStatus,
+} from "../../services/notifications/reminderTypes";
 
 const clampPercent = (value: number): number => Math.max(0, Math.min(100, value));
 
@@ -34,6 +50,22 @@ const timeLabel = (timestamp: string): string => {
   if (Number.isNaN(date.getTime())) return "Today";
 
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+};
+
+const notificationStatusLabel = (status: NotificationPermissionStatus): string => {
+  if (status === "granted") return "Notifications enabled";
+  if (status === "denied") return "Notifications disabled";
+  if (status === "undetermined") return "Permission not requested";
+
+  return "Notifications unavailable";
+};
+
+const notificationUnavailableMessage = (status: NotificationPermissionStatus): string => {
+  if (status === "denied") {
+    return "Notifications are disabled. Enable notifications in Android settings to use reminders.";
+  }
+
+  return "Healthy You could not enable notifications. You can still track habits and medication manually.";
 };
 
 export default function ScheduleScreen() {
@@ -47,10 +79,27 @@ export default function ScheduleScreen() {
   const uncompleteHabit = useScheduleStore((state) => state.uncompleteHabit);
   const logMedication = useScheduleStore((state) => state.logMedication);
   const clearMedicationLog = useScheduleStore((state) => state.clearMedicationLog);
+  const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionStatus>("undetermined");
+  const [scheduledReminders, setScheduledReminders] = useState<HealthReminderRecord[]>([]);
+  const [reminderBusyKey, setReminderBusyKey] = useState<string | null>(null);
+
+  const refreshReminderState = useCallback(async () => {
+    const [status, reminders] = await Promise.all([
+      getStoredNotificationStatus(),
+      listScheduledReminders(),
+    ]);
+
+    setNotificationStatus(status);
+    setScheduledReminders(reminders);
+  }, []);
 
   useEffect(() => {
     void hydrateSchedule();
   }, [hydrateSchedule]);
+
+  useEffect(() => {
+    void refreshReminderState();
+  }, [refreshReminderState]);
 
   const todayKey = getLocalDateKey();
   const todayHabitCompletions = useMemo(
@@ -83,6 +132,15 @@ export default function ScheduleScreen() {
 
     return byMedication;
   }, [todayMedicationLogs]);
+  const reminderByKey = useMemo(() => {
+    const byKey = new Map<string, HealthReminderRecord>();
+
+    scheduledReminders.forEach((reminder) => {
+      byKey.set(reminder.key, reminder);
+    });
+
+    return byKey;
+  }, [scheduledReminders]);
 
   if (!schedule) {
     return (
@@ -140,11 +198,137 @@ export default function ScheduleScreen() {
       "Hydration logging is available in Nutrition for this beta. Use the water buttons there to add 250 ml or 500 ml.",
     );
   };
+  const handleEnableNotifications = () => {
+    setReminderBusyKey("permission");
+    void requestNotificationPermission()
+      .then((status) => {
+        setNotificationStatus(status);
+        Alert.alert(
+          status === "granted" ? "Notifications enabled" : "Notifications unavailable",
+          status === "granted"
+            ? "Healthy You can schedule local reminders on this device."
+            : notificationUnavailableMessage(status),
+        );
+      })
+      .finally(() => {
+        setReminderBusyKey(null);
+        void refreshReminderState();
+      });
+  };
+  const handleScheduleMedicationReminder = (medication: MedicationReminder) => {
+    const key = getReminderKey("medication", medication.id);
+
+    setReminderBusyKey(key);
+    void scheduleMedicationReminder(medication)
+      .then((result) => {
+        Alert.alert(
+          result.ok ? "Reminder scheduled" : "Reminder unavailable",
+          result.ok ? `Daily local reminder set for ${result.record.timeLabel}.` : result.message,
+        );
+      })
+      .finally(() => {
+        setReminderBusyKey(null);
+        void refreshReminderState();
+      });
+  };
+  const handleScheduleHabitReminder = (habit: Habit) => {
+    const key = getReminderKey("habit", habit.id);
+
+    setReminderBusyKey(key);
+    void scheduleHabitReminder(habit)
+      .then((result) => {
+        Alert.alert(
+          result.ok ? "Reminder scheduled" : "Reminder unavailable",
+          result.ok ? `Daily local reminder set for ${result.record.timeLabel}.` : result.message,
+        );
+      })
+      .finally(() => {
+        setReminderBusyKey(null);
+        void refreshReminderState();
+      });
+  };
+  const handleScheduleHydrationReminder = () => {
+    const key = getHydrationReminderKey();
+
+    setReminderBusyKey(key);
+    void scheduleHydrationReminder()
+      .then((result) => {
+        Alert.alert(
+          result.ok ? "Reminder scheduled" : "Reminder unavailable",
+          result.ok ? `Daily hydration reminder set for ${result.record.timeLabel}.` : result.message,
+        );
+      })
+      .finally(() => {
+        setReminderBusyKey(null);
+        void refreshReminderState();
+      });
+  };
+  const handleCancelReminder = (key: string) => {
+    setReminderBusyKey(key);
+    void cancelScheduledReminder(key)
+      .then(() => {
+        Alert.alert("Reminder removed", "This local reminder was cancelled on this device.");
+      })
+      .finally(() => {
+        setReminderBusyKey(null);
+        void refreshReminderState();
+      });
+  };
+  const handleAddAppointmentToCalendar = (appointment: Appointment) => {
+    Alert.alert(
+      "Add to device calendar?",
+      "Healthy You will add a generic wellness appointment title to your calendar to avoid exposing sensitive details.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Add",
+          onPress: () => {
+            void addAppointmentToDeviceCalendar(appointment).then((result) => {
+              Alert.alert(
+                result.ok ? "Calendar event added" : "Calendar unavailable",
+                result.ok
+                  ? `A generic wellness event was added to ${result.calendarTitle}.`
+                  : result.message,
+              );
+            });
+          },
+        },
+      ],
+    );
+  };
+  const renderReminderAction = (
+    key: string,
+    onSchedule: () => void,
+    inactiveLabel: string,
+  ) => {
+    const reminder = reminderByKey.get(key);
+    const isBusy = reminderBusyKey === key;
+
+    return (
+      <TouchableOpacity
+        accessibilityLabel={reminder ? `Cancel ${inactiveLabel}` : inactiveLabel}
+        accessibilityRole="button"
+        activeOpacity={0.82}
+        disabled={isBusy}
+        onPress={reminder ? () => handleCancelReminder(key) : onSchedule}
+        style={[styles.reminderActionButton, reminder && styles.reminderCancelButton, isBusy && styles.disabledAction]}
+      >
+        <Ionicons
+          color={reminder ? COLORS.textMuted : COLORS.white}
+          name={reminder ? "notifications-off-outline" : "notifications-outline"}
+          size={15}
+        />
+        <Text style={[styles.reminderActionText, reminder && styles.reminderCancelText]}>
+          {isBusy ? "Updating..." : reminder ? `On at ${reminder.timeLabel}` : "Daily reminder"}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
   const handleScheduleAction = (title: string) => {
     if (title.toLowerCase().includes("medication")) {
       Alert.alert(
         "Medication tracking",
-        "Use today's medication cards to mark a reminder taken or skipped. Custom medication setup is coming after beta.",
+        "Use today's medication cards to mark taken or skipped. Use each Daily reminder button for local reminders. Custom medication setup is coming after beta.",
       );
       return;
     }
@@ -152,7 +336,7 @@ export default function ScheduleScreen() {
     if (title.toLowerCase().includes("habit")) {
       Alert.alert(
         "Habit tracking",
-        "Use today's habit cards to mark completion. Custom habit setup is coming after beta.",
+        "Use today's habit cards to mark completion. Use each Daily reminder button for local reminders. Custom habit setup is coming after beta.",
       );
       return;
     }
@@ -292,6 +476,48 @@ export default function ScheduleScreen() {
           </View>
         </CustomCard>
 
+        <DashboardSection title="Local Reminders" />
+        <CustomCard style={styles.localReminderCard}>
+          <View style={styles.localReminderHeader}>
+            <View style={styles.localReminderIcon}>
+              <Ionicons color={SCHEDULE_COLORS.dark} name="notifications-outline" size={20} />
+            </View>
+            <View style={styles.localReminderCopy}>
+              <Text style={styles.localReminderTitle}>Device reminders</Text>
+              <Text style={styles.localReminderText}>
+                {notificationStatus === "granted"
+                  ? `${scheduledReminders.length} local health reminder${scheduledReminders.length === 1 ? "" : "s"} scheduled.`
+                  : `${notificationStatusLabel(notificationStatus)}. Enable notifications to schedule local habit, medication, and hydration reminders.`}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.localReminderActions}>
+            <TouchableOpacity
+              accessibilityLabel="Enable local reminders"
+              accessibilityRole="button"
+              activeOpacity={0.82}
+              disabled={reminderBusyKey === "permission"}
+              onPress={handleEnableNotifications}
+              style={[styles.reminderActionButton, reminderBusyKey === "permission" && styles.disabledAction]}
+            >
+              <Ionicons color={COLORS.white} name="shield-checkmark-outline" size={15} />
+              <Text style={styles.reminderActionText}>
+                {reminderBusyKey === "permission" ? "Checking..." : notificationStatus === "granted" ? "Enabled" : "Enable"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityLabel="Refresh local reminder status"
+              accessibilityRole="button"
+              activeOpacity={0.82}
+              onPress={() => void refreshReminderState()}
+              style={[styles.reminderActionButton, styles.reminderSecondaryButton]}
+            >
+              <Ionicons color={SCHEDULE_COLORS.dark} name="refresh-outline" size={15} />
+              <Text style={[styles.reminderActionText, styles.reminderSecondaryText]}>Refresh</Text>
+            </TouchableOpacity>
+          </View>
+        </CustomCard>
+
         <DashboardSection title="Today's Timeline" />
         {schedule.timelineEvents.length > 0 ? (
           <View style={styles.timeline}>
@@ -364,6 +590,11 @@ export default function ScheduleScreen() {
                   loggedAt={log ? timeLabel(log.loggedAt) : undefined}
                   medication={medication}
                   onClear={log ? () => handleClearMedication(log) : undefined}
+                  reminderAction={renderReminderAction(
+                    getReminderKey("medication", medication.id),
+                    () => handleScheduleMedicationReminder(medication),
+                    `${medication.name} reminder`,
+                  )}
                   onSkip={() => handleMedicationStatus(medication.id, "skipped")}
                   onTaken={() => handleMedicationStatus(medication.id, "taken")}
                 />
@@ -408,6 +639,11 @@ export default function ScheduleScreen() {
             <Ionicons color={COLORS.white} name="add" size={20} />
             <Text style={styles.quickAddText}>Quick Add</Text>
           </TouchableOpacity>
+          {renderReminderAction(
+            getHydrationReminderKey(),
+            handleScheduleHydrationReminder,
+            "hydration reminder",
+          )}
         </CustomCard>
 
         <DashboardSection title="Sleep Schedule" />
@@ -417,7 +653,11 @@ export default function ScheduleScreen() {
         {schedule.appointments.length > 0 ? (
           <View style={styles.list}>
             {schedule.appointments.map((appointment) => (
-              <AppointmentCard appointment={appointment} key={appointment.id} />
+              <AppointmentCard
+                appointment={appointment}
+                key={appointment.id}
+                onAddToCalendar={() => handleAddAppointmentToCalendar(appointment)}
+              />
             ))}
           </View>
         ) : (
@@ -461,6 +701,11 @@ export default function ScheduleScreen() {
                   isCompletedToday={Boolean(completion)}
                   key={habit.id}
                   onComplete={() => handleCompleteHabit(habit.id)}
+                  reminderAction={renderReminderAction(
+                    getReminderKey("habit", habit.id),
+                    () => handleScheduleHabitReminder(habit),
+                    `${habit.title} reminder`,
+                  )}
                   onUndoComplete={completion ? () => handleUndoHabit(completion) : undefined}
                 />
               );
@@ -566,6 +811,73 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.md,
+  },
+  localReminderCard: {
+    gap: SPACING.md,
+    padding: SPACING.lg,
+  },
+  localReminderHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.md,
+  },
+  localReminderIcon: {
+    alignItems: "center",
+    backgroundColor: SCHEDULE_COLORS.light,
+    borderRadius: 14,
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+  localReminderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  localReminderTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  localReminderText: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 16,
+    marginTop: SPACING.xs,
+  },
+  localReminderActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  reminderActionButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: SCHEDULE_COLORS.dark,
+    borderRadius: SPACING.lg,
+    flexDirection: "row",
+    gap: SPACING.xs,
+    minHeight: 34,
+    paddingHorizontal: SPACING.md,
+  },
+  reminderActionText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  reminderCancelButton: {
+    backgroundColor: COLORS.surfaceMuted,
+  },
+  reminderCancelText: {
+    color: COLORS.textMuted,
+  },
+  reminderSecondaryButton: {
+    backgroundColor: SCHEDULE_COLORS.light,
+  },
+  reminderSecondaryText: {
+    color: SCHEDULE_COLORS.dark,
+  },
+  disabledAction: {
+    opacity: 0.58,
   },
   timeline: {
     marginTop: SPACING.xs,

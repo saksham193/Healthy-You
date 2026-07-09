@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Image,
   LayoutChangeEvent,
   Modal,
   Platform,
@@ -29,11 +30,23 @@ import NutritionActionCard from "../../components/nutrition/NutritionActionCard"
 import NutritionInsightCard from "../../components/nutrition/NutritionInsightCard";
 import NutritionMealCard from "../../components/nutrition/NutritionMealCard";
 import { useHealthData } from "../../hooks/useHealthData";
+import {
+  cancelScheduledReminder,
+  getHydrationReminderKey,
+  listScheduledReminders,
+  scheduleHydrationReminder,
+} from "../../services/notifications/reminderScheduler";
+import {
+  captureFoodPhotoWithCamera,
+  pickFoodPhotoFromLibrary,
+} from "../../services/media/imagePickerService";
 import { getLocalDateKey, useNutritionStore } from "../../store/nutritionStore";
 import { COLORS, NUTRITION_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { MacroNutrient, NutritionInsight, NutritionLogEntry, NutritionMeal, NutritionMealType, RootTabParamList } from "../../types";
+import type { HealthReminderRecord } from "../../services/notifications/reminderTypes";
+import type { FoodScanImageDraft } from "../../services/media/mediaTypes";
 import { getNutritionInsightToneColors, getNutritionMacroToneColors } from "../../utils/tone";
 
 const nutritionTabs = ["Personalized Plan", "Ayurveda", "Recipes"] as const;
@@ -225,6 +238,9 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
   const updateMeal = useNutritionStore((state) => state.updateMeal);
   const deleteMeal = useNutritionStore((state) => state.deleteMeal);
   const addWater = useNutritionStore((state) => state.addWater);
+  const [scheduledReminders, setScheduledReminders] = useState<HealthReminderRecord[]>([]);
+  const [hydrationReminderBusy, setHydrationReminderBusy] = useState(false);
+  const [foodScanDraft, setFoodScanDraft] = useState<FoodScanImageDraft | null>(null);
   const selectedTabIndex = nutritionTabs.indexOf(selectedTab);
   const todayKey = getLocalDateKey();
   const todayMeals = useMemo(
@@ -253,6 +269,14 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
   useEffect(() => {
     void hydrateNutrition();
   }, [hydrateNutrition]);
+
+  const refreshHydrationReminderState = useCallback(async () => {
+    setScheduledReminders(await listScheduledReminders());
+  }, []);
+
+  useEffect(() => {
+    void refreshHydrationReminderState();
+  }, [refreshHydrationReminderState]);
 
   if (!nutrition) {
     return (
@@ -325,13 +349,15 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
   const macroRows = [protein, carbs, fat].filter((macro): macro is MacroNutrient => Boolean(macro));
   const calorieTone = getNutritionInsightToneColors("calories", "Calories", "primary");
   const waterTone = getNutritionInsightToneColors("hydration", "Hydration", "warning");
+  const hydrationReminderKey = getHydrationReminderKey();
+  const hydrationReminder = scheduledReminders.find((reminder) => reminder.key === hydrationReminderKey);
   const onTabsLayout = (event: LayoutChangeEvent): void => {
     setSegmentWidth(event.nativeEvent.layout.width / nutritionTabs.length);
   };
 
-  const openAddMeal = () => {
+  const openAddMeal = (preset?: Partial<MealFormState>) => {
     setEditingMeal(null);
-    setMealForm(emptyMealForm);
+    setMealForm({ ...emptyMealForm, ...preset });
     setMealModalVisible(true);
   };
 
@@ -402,6 +428,76 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
       Alert.alert("Hydration updated", `${amountMl} ml water added for today.`);
     });
   };
+  const handleHydrationReminder = () => {
+    setHydrationReminderBusy(true);
+    const action = hydrationReminder
+      ? cancelScheduledReminder(hydrationReminderKey).then(() => ({
+          title: "Reminder removed",
+          message: "The daily hydration reminder was cancelled on this device.",
+        }))
+      : scheduleHydrationReminder().then((result) => ({
+          title: result.ok ? "Reminder scheduled" : "Reminder unavailable",
+          message: result.ok ? `Daily hydration reminder set for ${result.record.timeLabel}.` : result.message,
+        }));
+
+    void action
+      .then(({ title, message }) => {
+        Alert.alert(title, message);
+      })
+      .finally(() => {
+        setHydrationReminderBusy(false);
+        void refreshHydrationReminderState();
+      });
+  };
+  const beginManualLogFromFoodScan = (draft: FoodScanImageDraft) => {
+    openAddMeal({
+      title: "Photo meal draft",
+      notes: [
+        "Photo selected for manual review.",
+        `Source: ${draft.source === "camera" ? "Camera" : "Photo library"}.`,
+        "AI nutrition recognition is not enabled in this beta build; enter calories and macros yourself.",
+      ].join(" "),
+    });
+  };
+  const handleFoodScanResult = (result: Awaited<ReturnType<typeof pickFoodPhotoFromLibrary>>) => {
+    if (!result.ok) {
+      if (result.reason !== "cancelled") {
+        Alert.alert("Food Scan unavailable", result.message);
+      }
+      return;
+    }
+
+    setFoodScanDraft(result.asset);
+    Alert.alert(
+      "Photo captured",
+      "AI nutrition recognition will be added after backend vision validation. Please review and log this meal manually.",
+      [
+        { text: "Later", style: "cancel" },
+        { text: "Log Manually", onPress: () => setTimeout(() => beginManualLogFromFoodScan(result.asset), 0) },
+      ],
+    );
+  };
+  const handleFoodScan = () => {
+    Alert.alert(
+      "Food Scan",
+      "Choose a meal photo source. Healthy You will not upload or analyze the image in this beta build.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Camera",
+          onPress: () => {
+            void captureFoodPhotoWithCamera().then(handleFoodScanResult);
+          },
+        },
+        {
+          text: "Photo Library",
+          onPress: () => {
+            void pickFoodPhotoFromLibrary().then(handleFoodScanResult);
+          },
+        },
+      ],
+    );
+  };
 
   const handleNutritionAction = (title: string) => {
     const normalizedTitle = title.toLowerCase();
@@ -412,14 +508,7 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
     }
 
     if (normalizedTitle.includes("scan")) {
-      Alert.alert(
-        "Food scan coming after beta",
-        "Photo-based food scanning is not enabled in this beta build. You can log this meal manually now.",
-        [
-          { text: "Not now", style: "cancel" },
-          { text: "Log Meal", onPress: openAddMeal },
-        ],
-      );
+      handleFoodScan();
       return;
     }
 
@@ -563,6 +652,32 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
                 />
               </CustomCard>
 
+              {foodScanDraft ? (
+                <CustomCard style={styles.foodScanPreviewCard}>
+                  <Image
+                    accessibilityLabel="Selected food scan photo"
+                    source={{ uri: foodScanDraft.uri }}
+                    style={styles.foodScanPreviewImage}
+                  />
+                  <View style={styles.foodScanPreviewCopy}>
+                    <Text numberOfLines={1} style={styles.foodScanPreviewTitle}>Food Scan draft</Text>
+                    <Text style={styles.foodScanPreviewText}>
+                      Photo captured locally. AI recognition is deferred until backend vision validation.
+                    </Text>
+                    <TouchableOpacity
+                      accessibilityLabel="Log scanned meal manually"
+                      accessibilityRole="button"
+                      activeOpacity={0.82}
+                      onPress={() => beginManualLogFromFoodScan(foodScanDraft)}
+                      style={styles.foodScanPreviewButton}
+                    >
+                      <Ionicons color={COLORS.white} name="create-outline" size={16} />
+                      <Text style={styles.foodScanPreviewButtonText}>Log Manually</Text>
+                    </TouchableOpacity>
+                  </View>
+                </CustomCard>
+              ) : null}
+
               <DashboardSection title="Macronutrients" />
               {localNutrition.macros.length > 0 ? (
                 <View style={styles.macroGrid}>
@@ -624,6 +739,38 @@ export default function NutritionScreen({ navigation }: NutritionScreenProps) {
                     >
                       <Ionicons color={waterTone.foreground} name="add" size={16} />
                       <Text style={[styles.hydrationButtonText, { color: waterTone.foreground }]}>500 ml</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      accessibilityLabel={hydrationReminder ? "Cancel daily hydration reminder" : "Schedule daily hydration reminder"}
+                      accessibilityRole="button"
+                      activeOpacity={0.82}
+                      disabled={hydrationReminderBusy}
+                      onPress={handleHydrationReminder}
+                      style={[
+                        styles.hydrationButton,
+                        styles.hydrationReminderButton,
+                        hydrationReminder && styles.hydrationReminderCancelButton,
+                        hydrationReminderBusy && styles.hydrationReminderDisabled,
+                      ]}
+                    >
+                      <Ionicons
+                        color={hydrationReminder ? COLORS.textMuted : COLORS.white}
+                        name={hydrationReminder ? "notifications-off-outline" : "notifications-outline"}
+                        size={16}
+                      />
+                      <Text
+                        style={[
+                          styles.hydrationButtonText,
+                          styles.hydrationReminderText,
+                          hydrationReminder && styles.hydrationReminderCancelText,
+                        ]}
+                      >
+                        {hydrationReminderBusy
+                          ? "Updating..."
+                          : hydrationReminder
+                            ? `On at ${hydrationReminder.timeLabel}`
+                            : "Daily reminder"}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1135,6 +1282,49 @@ const styles = StyleSheet.create({
     borderRadius: SPACING.sm,
     height: "100%",
   },
+  foodScanPreviewCard: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.md,
+    padding: SPACING.md,
+  },
+  foodScanPreviewImage: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: SPACING.md,
+    height: 86,
+    width: 86,
+  },
+  foodScanPreviewCopy: {
+    flex: 1,
+    gap: SPACING.xs,
+    minWidth: SPACING.cardMinWidth,
+  },
+  foodScanPreviewTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  foodScanPreviewText: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 16,
+  },
+  foodScanPreviewButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: NUTRITION_COLORS.secondary,
+    borderRadius: SPACING.lg,
+    flexDirection: "row",
+    gap: SPACING.xs,
+    minHeight: 34,
+    paddingHorizontal: SPACING.md,
+  },
+  foodScanPreviewButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
   goalText: {
     color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.xs,
@@ -1158,6 +1348,21 @@ const styles = StyleSheet.create({
   hydrationButtonText: {
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.heavy,
+  },
+  hydrationReminderButton: {
+    backgroundColor: NUTRITION_COLORS.secondary,
+  },
+  hydrationReminderCancelButton: {
+    backgroundColor: COLORS.surfaceMuted,
+  },
+  hydrationReminderDisabled: {
+    opacity: 0.58,
+  },
+  hydrationReminderText: {
+    color: COLORS.white,
+  },
+  hydrationReminderCancelText: {
+    color: COLORS.textMuted,
   },
   list: {
     gap: SPACING.md,

@@ -307,6 +307,7 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
           <View style={styles.statsRowCompact}>
             <StatsCard
               icon="checkmark-circle-outline"
+              style={styles.manualSummaryCard}
               subtitle="manual completions"
               title="Today"
               tone="primary"
@@ -315,6 +316,7 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
             />
             <StatsCard
               icon="timer-outline"
+              style={styles.manualSummaryCard}
               subtitle="from completed plans"
               title="Active Minutes"
               tone="accent"
@@ -323,6 +325,7 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
             />
             <StatsCard
               icon="flame-outline"
+              style={styles.manualSummaryCard}
               subtitle="estimated workout burn"
               title="Manual Burn"
               tone="warning"
@@ -331,6 +334,7 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
             />
             <StatsCard
               icon="calendar-outline"
+              style={styles.manualSummaryCard}
               subtitle="since Monday"
               title="This Week"
               tone="primary"
@@ -768,6 +772,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.md,
+  },
+  manualSummaryCard: {
+    flexBasis: "47%",
+    minHeight: 148,
+    minWidth: 150,
   },
   emptyCard: {
     padding: 0,

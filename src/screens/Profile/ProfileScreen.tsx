@@ -20,6 +20,12 @@ import ScreenContainer from "../../components/common/ScreenContainer";
 import { useDevices } from "../../hooks/useDevices";
 import { useHealthData } from "../../hooks/useHealthData";
 import { updateCurrentUser } from "../../services/api/UserApi";
+import { requestNotificationPermission } from "../../services/notifications/notificationService";
+import {
+  cancelAllHealthReminders,
+  getStoredNotificationStatus,
+  listScheduledReminders,
+} from "../../services/notifications/reminderScheduler";
 import { useAuthStore } from "../../store/authStore";
 import { useFitnessStore } from "../../store/fitnessStore";
 import { useNutritionStore } from "../../store/nutritionStore";
@@ -29,6 +35,10 @@ import { COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
 import type { BodyMetric, ProfileData } from "../../types";
+import type {
+  HealthReminderRecord,
+  NotificationPermissionStatus,
+} from "../../services/notifications/reminderTypes";
 
 type ProfileDraft = {
   name: string;
@@ -73,6 +83,22 @@ const metricValueToNumber = (metric: BodyMetric | undefined): number | undefined
 };
 
 const metricDraftValue = (value: number | undefined): string => (value ? formatNumber(value) : "");
+
+const notificationStatusLabel = (status: NotificationPermissionStatus): string => {
+  if (status === "granted") return "Notifications enabled";
+  if (status === "denied") return "Notifications disabled";
+  if (status === "undetermined") return "Permission not requested";
+
+  return "Notifications unavailable";
+};
+
+const notificationUnavailableMessage = (status: NotificationPermissionStatus): string => {
+  if (status === "denied") {
+    return "Notifications are disabled. Enable notifications in Android settings to use reminders.";
+  }
+
+  return "Healthy You could not enable notifications. Local tracking still works without reminders.";
+};
 
 const applyLocalProfileEdits = (
   profile: ProfileData,
@@ -140,6 +166,10 @@ export default function ProfileScreen() {
   const [exportVisible, setExportVisible] = useState(false);
   const [exportPreview, setExportPreview] = useState("");
   const [resettingLocalData, setResettingLocalData] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionStatus>("undetermined");
+  const [scheduledReminders, setScheduledReminders] = useState<HealthReminderRecord[]>([]);
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [clearingReminders, setClearingReminders] = useState(false);
   const effectiveProfile = useMemo(
     () => (profile ? applyLocalProfileEdits(profile, localProfile) : null),
     [localProfile, profile],
@@ -157,6 +187,20 @@ export default function ProfileScreen() {
     void hydrateFitness();
     void hydrateSchedule();
   }, [hydrateFitness, hydrateLocalProfile, hydrateNutrition, hydrateSchedule]);
+
+  const refreshNotificationState = async () => {
+    const [status, reminders] = await Promise.all([
+      getStoredNotificationStatus(),
+      listScheduledReminders(),
+    ]);
+
+    setNotificationStatus(status);
+    setScheduledReminders(reminders);
+  };
+
+  useEffect(() => {
+    void refreshNotificationState();
+  }, []);
 
   const isDeviceSyncing = devices.syncStatus === "syncing";
   const profileSyncLabel = (() => {
@@ -357,6 +401,52 @@ export default function ProfileScreen() {
           text: resettingLocalData ? "Clearing..." : "Clear Data",
           style: "destructive",
           onPress: () => void clearLocalWellnessData(),
+        },
+      ],
+    );
+  };
+  const handleEnableNotifications = () => {
+    setNotificationBusy(true);
+    void requestNotificationPermission()
+      .then((status) => {
+        setNotificationStatus(status);
+        Alert.alert(
+          status === "granted" ? "Notifications enabled" : "Notifications unavailable",
+          status === "granted"
+            ? "Healthy You can schedule local reminders on this device."
+            : notificationUnavailableMessage(status),
+        );
+      })
+      .finally(() => {
+        setNotificationBusy(false);
+        void refreshNotificationState();
+      });
+  };
+  const confirmClearHealthReminders = () => {
+    if (scheduledReminders.length === 0) {
+      Alert.alert("No reminders", "There are no Healthy You local reminders scheduled on this device.");
+      return;
+    }
+
+    Alert.alert(
+      "Clear health reminders?",
+      "This cancels Healthy You local reminders on this device. Your logs and sign-in session are unchanged.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => {
+            setClearingReminders(true);
+            void cancelAllHealthReminders()
+              .then((count) => {
+                Alert.alert("Reminders cleared", `${count} local reminder${count === 1 ? "" : "s"} removed.`);
+              })
+              .finally(() => {
+                setClearingReminders(false);
+                void refreshNotificationState();
+              });
+          },
         },
       ],
     );
@@ -613,6 +703,14 @@ export default function ProfileScreen() {
           />
           <SettingRow
             destructive
+            disabled={clearingReminders}
+            iconName="notifications-off-outline"
+            onPress={confirmClearHealthReminders}
+            subtitle={`${scheduledReminders.length} local reminder${scheduledReminders.length === 1 ? "" : "s"} scheduled. Logs are unchanged.`}
+            title={clearingReminders ? "Clearing Reminders" : "Clear Health Reminders"}
+          />
+          <SettingRow
+            destructive
             iconName="person-remove-outline"
             onPress={showAccountDeletionNotice}
             subtitle="Backend account deletion is beta-deferred until a validated endpoint exists."
@@ -642,6 +740,38 @@ export default function ProfileScreen() {
           >
             <Ionicons color={COLORS.brandDeepBlue} name="refresh-outline" size={18} />
             <Text style={styles.secondaryButtonText}>Review Device Sync</Text>
+          </Pressable>
+          <View style={styles.permissionDivider} />
+          <View style={styles.permissionHeader}>
+            <View style={styles.permissionIcon}>
+              <Ionicons color={COLORS.brandDeepBlue} name="notifications-outline" size={20} />
+            </View>
+            <View style={styles.permissionCopy}>
+              <Text style={styles.permissionTitle}>Local Notifications</Text>
+              <Text style={styles.permissionStatus}>
+                {notificationStatus === "granted"
+                  ? `${scheduledReminders.length} Healthy You reminder${scheduledReminders.length === 1 ? "" : "s"} scheduled`
+                  : notificationStatusLabel(notificationStatus)}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.permissionText}>
+            Reminders are scheduled locally on this device. Healthy You does not register push tokens or send reminder requests to the backend in this beta build.
+          </Text>
+          <Pressable
+            accessibilityLabel="Enable local notifications"
+            accessibilityRole="button"
+            disabled={notificationBusy}
+            onPress={handleEnableNotifications}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              (pressed || notificationBusy) && styles.secondaryButtonPressed,
+            ]}
+          >
+            <Ionicons color={COLORS.brandDeepBlue} name="shield-checkmark-outline" size={18} />
+            <Text style={styles.secondaryButtonText}>
+              {notificationBusy ? "Checking..." : notificationStatus === "granted" ? "Notifications Enabled" : "Enable Notifications"}
+            </Text>
           </Pressable>
         </CustomCard>
 
@@ -1091,6 +1221,11 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.sm,
     lineHeight: TYPOGRAPHY.lineHeights.md,
+  },
+  permissionDivider: {
+    backgroundColor: COLORS.border,
+    height: 1,
+    width: "100%",
   },
   secondaryButton: {
     alignItems: "center",

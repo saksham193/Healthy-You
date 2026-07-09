@@ -15,6 +15,7 @@ type MedicationReminderCardProps = {
   onClear?: () => void;
   onSkip?: () => void;
   onTaken?: () => void;
+  reminderAction?: React.ReactNode;
 };
 
 export default function MedicationReminderCard({
@@ -24,6 +25,7 @@ export default function MedicationReminderCard({
   onClear,
   onSkip,
   onTaken,
+  reminderAction,
 }: MedicationReminderCardProps) {
   const effectiveTone = localStatus === "taken"
     ? "accent"
@@ -93,6 +95,7 @@ export default function MedicationReminderCard({
           </>
         )}
       </View>
+      {reminderAction}
     </CustomCard>
   );
 }
