@@ -8,7 +8,7 @@ This checkpoint contains the completed Phase 3 AI Platform through `v0.13.0-alph
 
 - Health dashboard with nutrition, fitness, sleep, schedule, profile, and device data.
 - Android Health Connect integration for local health summaries.
-- Cloud profile, memory, and health-summary sync with offline queues.
+- Cloud sync architecture foundation with sync disabled by default until explicit future consent and production persistence are ready.
 - Secure authentication with token storage via SecureStore.
 - Medibot AI assistant with direct metric answers and safe wellness guidance.
 - Offline AI mode with local rules, cache, and safety handling.
@@ -121,6 +121,8 @@ node scripts/validate-ai-quality.js
 - Phase 5C Food Scan foundation with camera/photo selection and user-confirmed meal logging.
 - Phase 5D advanced Medibot input planning for voice transcription and safe attachments.
 - Phase 5E calendar/device integrations after reminder and media permission flows are stable.
+- Phase 6 started with Phase 6A cloud sync architecture, data contracts, backend readiness, and disabled-by-default sync foundations.
+- Full cloud sync, backend persistence, conflict handling, account deletion, and data export remain future Phase 6 work.
 
 ## Tech Stack
 
@@ -138,6 +140,7 @@ node scripts/validate-ai-quality.js
 - Local env files are ignored.
 - Tokens are stored through SecureStore.
 - AsyncStorage queues must not contain credentials.
+- Cloud sync is disabled by default in Phase 6A; local health data is not automatically uploaded.
 - Generated builds, caches, node modules, backend data, and SQLite files are ignored.
 - AI safety guard blocks diagnosis, medication dosage, emergency, and self-harm requests.
 

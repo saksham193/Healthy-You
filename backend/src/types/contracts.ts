@@ -278,6 +278,68 @@ export const healthSummarySchema = z.object({
   updatedAt: isoDateString,
 }).strict();
 
+export const syncEntityTypeSchema = z.enum([
+  "nutrition_log",
+  "fitness_log",
+  "schedule_routine",
+  "profile_settings",
+]);
+
+export const syncOperationSchema = z.enum(["create", "update", "delete"]);
+
+export const syncQueueItemSchema = z.object({
+  id: z.string().min(1).max(180),
+  entityType: syncEntityTypeSchema,
+  entityId: z.string().min(1).max(180),
+  operation: syncOperationSchema,
+  payload: z.unknown(),
+  localUpdatedAt: isoDateString,
+  queuedAt: isoDateString,
+  retryCount: z.number().int().min(0).max(100),
+}).strict();
+
+export const syncPushRequestSchema = z.object({
+  items: z.array(syncQueueItemSchema).max(100),
+}).strict();
+
+export const syncStatusSchema = z.enum(["accepted", "conflict", "rejected", "not_enabled"]);
+
+export const syncResponseSchema = z.object({
+  status: syncStatusSchema,
+  serverUpdatedAt: isoDateString.optional(),
+  conflict: z.object({
+    entityType: syncEntityTypeSchema,
+    entityId: z.string().min(1).max(180),
+    reason: z.string().min(1).max(240),
+  }).strict().optional(),
+}).strict();
+
+export const syncPushResponseSchema = z.object({
+  status: z.literal("not_enabled"),
+  code: z.literal("sync_not_enabled"),
+  message: z.string().min(1).max(240),
+  results: z.array(syncResponseSchema),
+}).strict();
+
+export const syncPullResponseSchema = z.object({
+  status: z.literal("not_enabled"),
+  code: z.literal("sync_not_enabled"),
+  message: z.string().min(1).max(240),
+  items: z.array(syncQueueItemSchema),
+  serverUpdatedAt: isoDateString,
+}).strict();
+
+export const cloudProfileSettingsSchema = z.object({
+  displayName: z.string().min(1).max(120).optional(),
+  appPreferences: z.record(z.string(), z.unknown()).optional(),
+  privacySettings: z.object({
+    syncConsentStatus: z.enum(["not_requested", "granted", "revoked"]).default("not_requested"),
+    rawMediaSyncAllowed: z.literal(false).default(false),
+    backgroundSyncAllowed: z.literal(false).default(false),
+  }).strict().optional(),
+  updatedAt: isoDateString,
+}).strict();
+
 export type BackendAIRequest = z.infer<typeof aiRequestSchema>;
 export type BackendAIResponse = z.infer<typeof aiResponseSchema>;
 export type BackendNutritionImageAnalysisResponse = z.infer<typeof nutritionImageAnalysisResponseSchema>;
@@ -288,3 +350,11 @@ export type RefreshTokenBody = z.infer<typeof refreshTokenSchema>;
 export type UpdateUserBody = z.infer<typeof updateUserSchema>;
 export type ProfileSyncBody = z.infer<typeof profileSyncSchema>;
 export type HealthSummaryBody = z.infer<typeof healthSummarySchema>;
+export type SyncEntityType = z.infer<typeof syncEntityTypeSchema>;
+export type SyncOperation = z.infer<typeof syncOperationSchema>;
+export type SyncQueueItem = z.infer<typeof syncQueueItemSchema>;
+export type SyncPushRequest = z.infer<typeof syncPushRequestSchema>;
+export type SyncResponse = z.infer<typeof syncResponseSchema>;
+export type SyncPushResponse = z.infer<typeof syncPushResponseSchema>;
+export type SyncPullResponse = z.infer<typeof syncPullResponseSchema>;
+export type CloudProfileSettings = z.infer<typeof cloudProfileSettingsSchema>;

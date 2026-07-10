@@ -12,6 +12,7 @@ import { fetchHealthSummaries, saveHealthSummary } from "../api/HealthSummaryApi
 import { connectivityService } from "../connectivity/ConnectivityService";
 import type { DeviceHealthMetrics } from "../device/providers/DeviceProvider";
 import { getStoredTokens } from "../secure/TokenStorage";
+import { isCloudSyncEnabled } from "../sync/syncFeatureFlags";
 
 const LOCAL_SUMMARIES_KEY = "healthy-you.health-summary.local";
 const HEALTH_SUMMARY_QUEUE_KEY = "healthy-you.health-summary.backup-queue";
@@ -311,9 +312,12 @@ const toOutcome = async (
 
 export async function queueHealthSummaryBackup(summary: HealthSummaryBackup): Promise<number> {
   const cleanSummary = sanitizeSummary(summary);
+  await saveCachedSummaries(mergeLocalAndRemoteHealthSummaries(await getCachedSummaries(), [cleanSummary]));
+
+  if (!isCloudSyncEnabled()) return 0;
+
   const queue = await getQueuedBackups();
 
-  await saveCachedSummaries(mergeLocalAndRemoteHealthSummaries(await getCachedSummaries(), [cleanSummary]));
   await saveQueuedBackups([
     {
       summary: cleanSummary,
@@ -328,6 +332,10 @@ export async function queueHealthSummaryBackup(summary: HealthSummaryBackup): Pr
 }
 
 export async function flushQueuedHealthSummaryBackups(): Promise<HealthSummarySyncOutcome> {
+  if (!isCloudSyncEnabled()) {
+    return toOutcome("idle", await getCachedSummaries());
+  }
+
   const tokens = await getStoredTokens();
   const cached = await getCachedSummaries();
   const queue = await getQueuedBackups();
@@ -367,6 +375,10 @@ export async function backupHealthSummaryToCloud(summary: HealthSummaryBackup): 
 
   await saveCachedSummaries(cached);
 
+  if (!isCloudSyncEnabled()) {
+    return toOutcome("idle", cached);
+  }
+
   const tokens = await getStoredTokens();
 
   if (!tokens) {
@@ -397,6 +409,11 @@ export async function backupHealthSummaryToCloud(summary: HealthSummaryBackup): 
 
 export async function loadHealthSummariesFromCloud(): Promise<HealthSummarySyncOutcome> {
   const cached = await getCachedSummaries();
+
+  if (!isCloudSyncEnabled()) {
+    return toOutcome("idle", cached);
+  }
+
   const tokens = await getStoredTokens();
 
   if (!tokens) {

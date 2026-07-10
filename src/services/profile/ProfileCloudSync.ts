@@ -3,6 +3,7 @@ import type { PersonalHealthProfile } from "../../types";
 import { fetchProfile, syncProfile } from "../api/ProfileApi";
 import { connectivityService } from "../connectivity/ConnectivityService";
 import { getStoredTokens } from "../secure/TokenStorage";
+import { isCloudSyncEnabled } from "../sync/syncFeatureFlags";
 
 const LOCAL_PROFILE_KEY = "healthy-you.profile.local";
 const PROFILE_QUEUE_KEY = "healthy-you.profile.sync-queue";
@@ -18,7 +19,7 @@ export type QueuedProfileUpdate = {
 export type ProfileSyncOutcome =
   | { status: "synced"; profile: PersonalHealthProfile; queuedCount: number }
   | { status: "pending" | "offline"; profile: PersonalHealthProfile | null; queuedCount: number; error?: string }
-  | { status: "skipped"; profile: PersonalHealthProfile | null; queuedCount: number; reason: "unauthenticated" };
+  | { status: "skipped"; profile: PersonalHealthProfile | null; queuedCount: number; reason: "unauthenticated" | "cloud_sync_disabled" };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -187,10 +188,12 @@ const saveQueuedProfileUpdates = async (updates: QueuedProfileUpdate[]): Promise
 };
 
 export async function queueProfileUpdateWhenOffline(profile: PersonalHealthProfile): Promise<number> {
+  await saveCachedProfile(profile);
+  if (!isCloudSyncEnabled()) return 0;
+
   const existing = await getQueuedProfileUpdates();
   const withoutSameTimestamp = existing.filter((item) => item.updatedAt !== profile.updatedAt);
 
-  await saveCachedProfile(profile);
   await saveQueuedProfileUpdates([
     ...withoutSameTimestamp,
     {
@@ -205,6 +208,10 @@ export async function queueProfileUpdateWhenOffline(profile: PersonalHealthProfi
 }
 
 export async function flushQueuedProfileUpdates(): Promise<{ profile: PersonalHealthProfile | null; queuedCount: number }> {
+  if (!isCloudSyncEnabled()) {
+    return { profile: await getCachedProfile(), queuedCount: 0 };
+  }
+
   const tokens = await getStoredTokens();
   let queue = await getQueuedProfileUpdates();
 
@@ -241,6 +248,11 @@ export async function loadProfileFromCloud(localDraft?: PersonalHealthProfile | 
   const cachedProfile = await getCachedProfile();
   const localProfile = reconcileProfiles(localDraft ?? null, cachedProfile).profile;
   const queuedCount = (await getQueuedProfileUpdates()).length;
+
+  if (!isCloudSyncEnabled()) {
+    return { status: "skipped", profile: localProfile, queuedCount: 0, reason: "cloud_sync_disabled" };
+  }
+
   const tokens = await getStoredTokens();
 
   if (!tokens) {
@@ -307,6 +319,10 @@ export async function loadProfileFromCloud(localDraft?: PersonalHealthProfile | 
 
 export async function syncProfileToCloud(profile: PersonalHealthProfile): Promise<ProfileSyncOutcome> {
   await saveCachedProfile(profile);
+
+  if (!isCloudSyncEnabled()) {
+    return { status: "skipped", profile, queuedCount: 0, reason: "cloud_sync_disabled" };
+  }
 
   const tokens = await getStoredTokens();
   const queuedCount = (await getQueuedProfileUpdates()).length;

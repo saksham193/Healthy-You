@@ -4,6 +4,7 @@ import { connectivityService } from "../connectivity/ConnectivityService";
 import { offlineAnalytics } from "../observability/OfflineAnalytics";
 import { deleteMemory as deleteRemoteMemory, fetchMemories, saveMemory as saveRemoteMemory } from "../api/MemoryApi";
 import { isCloudSafeMemory } from "../ai/memory/MemoryPrivacy";
+import { isCloudSyncEnabled } from "../sync/syncFeatureFlags";
 import type { OfflineMemoryQueueItem } from "./types";
 
 const QUEUE_KEY = "healthy-you.local-ai.memory-sync-queue";
@@ -97,6 +98,8 @@ export class OfflineMemoryQueue {
   private flushing = false;
 
   constructor() {
+    if (!isCloudSyncEnabled()) return;
+
     connectivityService.subscribe((status) => {
       if (status.isOnline) {
         void this.flushQueuedMemoryWrites();
@@ -105,6 +108,7 @@ export class OfflineMemoryQueue {
   }
 
   async syncOrQueue(memory: MemoryRecord): Promise<void> {
+    if (!isCloudSyncEnabled()) return;
     if (!isCloudSafeMemory(memory)) return;
 
     const online = await connectivityService.isOnline();
@@ -125,6 +129,8 @@ export class OfflineMemoryQueue {
   }
 
   async syncMemoriesToCloud(memories: MemoryRecord[]): Promise<void> {
+    if (!isCloudSyncEnabled()) return;
+
     const safeMemories = memories.filter(isCloudSafeMemory);
 
     if (!(await connectivityService.isOnline())) {
@@ -137,6 +143,7 @@ export class OfflineMemoryQueue {
   }
 
   async loadMemoriesFromCloud(localMemories: MemoryRecord[]): Promise<MemoryRecord[]> {
+    if (!isCloudSyncEnabled()) return localMemories;
     if (!(await connectivityService.isOnline())) return localMemories;
 
     try {
@@ -166,6 +173,8 @@ export class OfflineMemoryQueue {
     memories: MemoryRecord | MemoryRecord[],
     source: OfflineMemoryQueueItem["source"] = "offline",
   ): Promise<void> {
+    if (!isCloudSyncEnabled()) return;
+
     const safeMemories = (Array.isArray(memories) ? memories : [memories]).filter(isCloudSafeMemory);
 
     if (safeMemories.length === 0) return;
@@ -191,6 +200,7 @@ export class OfflineMemoryQueue {
   }
 
   async flushQueuedMemoryWrites(): Promise<void> {
+    if (!isCloudSyncEnabled()) return;
     if (this.flushing) return;
     if (!(await connectivityService.isOnline())) return;
 
@@ -224,6 +234,8 @@ export class OfflineMemoryQueue {
   }
 
   async deleteSyncedMemory(id: string): Promise<void> {
+    if (!isCloudSyncEnabled()) return;
+
     void deleteRemoteMemory(id).catch(() => undefined);
   }
 
