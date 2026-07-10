@@ -26,6 +26,12 @@ import DashboardSection from "../../components/layout/DashboardSection";
 import ScreenSheet from "../../components/layout/ScreenSheet";
 import { useAssistantData } from "../../hooks/useAssistantData";
 import { useMedibot } from "../../hooks/useMedibot";
+import {
+  AI_ATTACHMENT_ANALYSIS_UNAVAILABLE_MESSAGE,
+  analyzeMedibotAttachment,
+  type AttachmentAnalysisResult,
+} from "../../services/api/AIApi";
+import { ApiRequestError } from "../../services/api/ApiClient";
 import { connectivityService } from "../../services/connectivity/ConnectivityService";
 import type { ConnectivityStatus } from "../../services/connectivity/ConnectivityStatus";
 import { formatBytes, pickMedibotAttachment } from "../../services/media/documentPickerService";
@@ -56,6 +62,9 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
   });
   const [draft, setDraft] = useState("");
   const [selectedAttachment, setSelectedAttachment] = useState<PickedAttachment | null>(null);
+  const [attachmentAnalysis, setAttachmentAnalysis] = useState<AttachmentAnalysisResult | null>(null);
+  const [attachmentAnalysisMessage, setAttachmentAnalysisMessage] = useState<string | null>(null);
+  const [attachmentAnalyzing, setAttachmentAnalyzing] = useState(false);
   const [transientBotState, setTransientBotState] = useState<MedibotAnimationState | null>(null);
   const transientTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const talkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,16 +109,58 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
       }
 
       setSelectedAttachment(result.asset);
+      setAttachmentAnalysis(null);
+      setAttachmentAnalysisMessage(null);
       Alert.alert(
         "Attachment selected",
-        "Healthy You will not upload or analyze this file in the beta foundation. Paste relevant text into Medibot if you want to discuss it.",
+        "Attachment selected for local review. This file has not been uploaded or analyzed yet.",
       );
     });
   };
+  const runAttachmentAnalysis = async (attachment: PickedAttachment) => {
+    setAttachmentAnalyzing(true);
+    setAttachmentAnalysis(null);
+    setAttachmentAnalysisMessage(null);
+    showTransientBotState("thinking", 1400);
+
+    try {
+      const result = await analyzeMedibotAttachment(attachment);
+      setAttachmentAnalysis(result);
+      setAttachmentAnalysisMessage(null);
+      showTransientBotState("talking", 1600);
+    } catch (analysisError) {
+      const message = analysisError instanceof ApiRequestError
+        ? analysisError.message
+        : AI_ATTACHMENT_ANALYSIS_UNAVAILABLE_MESSAGE;
+
+      setAttachmentAnalysis(null);
+      setAttachmentAnalysisMessage(message);
+      showTransientBotState("notification", 1500);
+    } finally {
+      setAttachmentAnalyzing(false);
+    }
+  };
+  const handleAnalyzeAttachmentPress = () => {
+    if (!selectedAttachment || attachmentAnalyzing) return;
+
+    Alert.alert(
+      "Analyze attachment",
+      "Healthy You will upload this attachment to the backend for an AI-generated summary. It will not be saved automatically and is not medical advice.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Analyze",
+          onPress: () => {
+            if (selectedAttachment) void runAttachmentAnalysis(selectedAttachment);
+          },
+        },
+      ],
+    );
+  };
   const handleVoicePress = () => {
-    showTransientBotState("listening", 1800);
     const status = getVoiceInputFoundationStatus();
-    Alert.alert(status.title, status.message);
+    showTransientBotState(status.state === "unavailable" ? "notification" : "listening", 1800);
+    Alert.alert(status.title, `${status.message}\n\n${status.safetyNote}`);
   };
   const handleVoiceNotify = () => {
     showTransientBotState("notification", 1500);
@@ -304,18 +355,61 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
                   {selectedAttachment.mimeType} - {formatBytes(selectedAttachment.size)} - not uploaded
                 </Text>
                 <Text numberOfLines={2} style={styles.attachmentSafety}>
-                  Analysis and upload are not enabled yet.
+                  This file has not been uploaded or analyzed yet. Choose Analyze to continue.
                 </Text>
               </View>
+              <TouchableOpacity
+                accessibilityLabel="Analyze selected attachment"
+                accessibilityRole="button"
+                activeOpacity={0.78}
+                disabled={attachmentAnalyzing}
+                onPress={handleAnalyzeAttachmentPress}
+                style={[styles.attachmentAnalyzeButton, attachmentAnalyzing && styles.attachmentAnalyzeButtonDisabled]}
+              >
+                <Text numberOfLines={1} style={styles.attachmentAnalyzeText}>
+                  {attachmentAnalyzing ? "Analyzing" : "Analyze"}
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 accessibilityLabel="Remove selected attachment"
                 accessibilityRole="button"
                 activeOpacity={0.78}
-                onPress={() => setSelectedAttachment(null)}
+                disabled={attachmentAnalyzing}
+                onPress={() => {
+                  setSelectedAttachment(null);
+                  setAttachmentAnalysis(null);
+                  setAttachmentAnalysisMessage(null);
+                }}
                 style={styles.attachmentRemoveButton}
               >
                 <Ionicons color={COLORS.textMuted} name="close-outline" size={18} />
               </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {attachmentAnalysis || attachmentAnalysisMessage ? (
+            <View style={styles.attachmentResultCard}>
+              <View style={styles.attachmentResultHeader}>
+                <Ionicons color={COLORS.primary} name="sparkles-outline" size={18} />
+                <Text style={styles.attachmentResultTitle}>
+                  {attachmentAnalysis ? "Attachment summary" : "Attachment analysis"}
+                </Text>
+              </View>
+              <Text style={styles.attachmentResultText}>
+                {attachmentAnalysis?.summary ?? attachmentAnalysisMessage}
+              </Text>
+              {attachmentAnalysis ? (
+                <>
+                  <Text style={styles.attachmentResultSafety}>{attachmentAnalysis.safetyNote}</Text>
+                  {attachmentAnalysis.limitations.map((limitation) => (
+                    <Text key={limitation} style={styles.attachmentLimitation}>- {limitation}</Text>
+                  ))}
+                </>
+              ) : (
+                <Text style={styles.attachmentResultSafety}>
+                  AI summaries are for general wellness support only and are not medical advice.
+                </Text>
+              )}
             </View>
           ) : null}
 
@@ -504,6 +598,22 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: SPACING.xs,
   },
+  attachmentAnalyzeButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    borderRadius: SPACING.md,
+    justifyContent: "center",
+    minHeight: 34,
+    paddingHorizontal: SPACING.md,
+  },
+  attachmentAnalyzeButtonDisabled: {
+    opacity: 0.6,
+  },
+  attachmentAnalyzeText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
   attachmentRemoveButton: {
     alignItems: "center",
     backgroundColor: COLORS.surfaceMuted,
@@ -511,6 +621,40 @@ const styles = StyleSheet.create({
     height: 34,
     justifyContent: "center",
     width: 34,
+  },
+  attachmentResultCard: {
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.border,
+    borderRadius: SPACING.lg,
+    borderWidth: 1,
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+    padding: SPACING.md,
+  },
+  attachmentResultHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  attachmentResultTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  attachmentResultText: {
+    color: COLORS.text,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: 19,
+  },
+  attachmentResultSafety: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 17,
+  },
+  attachmentLimitation: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 17,
   },
   inputBar: {
     alignItems: "center",

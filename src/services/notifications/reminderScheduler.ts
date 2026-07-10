@@ -12,7 +12,7 @@ import type {
   ReminderScheduleResult,
   ScheduleReminderInput,
 } from "./reminderTypes";
-import type { Habit, MedicationReminder } from "../../types";
+import type { CustomHealthRoutine, Habit, MedicationReminder } from "../../types";
 
 const REMINDER_STORAGE_KEY = "healthy-you.health-reminders.v1";
 const HYDRATION_SOURCE_ID = "daily-hydration";
@@ -60,7 +60,7 @@ export const listScheduledReminders = async (): Promise<HealthReminderRecord[]> 
   return safeJsonParse(stored);
 };
 
-const cancelExistingReminder = async (key: string, records: HealthReminderRecord[]): Promise<HealthReminderRecord[]> => {
+const cancelExistingReminder = async (key: string, records: HealthReminderRecord[]): Promise<void> => {
   const existing = records.find((record) => record.key === key);
   if (existing) {
     try {
@@ -69,8 +69,6 @@ const cancelExistingReminder = async (key: string, records: HealthReminderRecord
       // Native notification state may already be cleared after reinstall; storage is still repaired below.
     }
   }
-
-  return records.filter((record) => record.key !== key);
 };
 
 const createPermissionMessage = (status: string): string => {
@@ -104,7 +102,6 @@ const scheduleReminder = async (
   try {
     const key = getReminderKey(input.kind, input.sourceId);
     const currentRecords = await listScheduledReminders();
-    const recordsWithoutExisting = await cancelExistingReminder(key, currentRecords);
     const notificationId = await scheduleDailyHealthNotification(input);
     const now = new Date().toISOString();
     const record: HealthReminderRecord = {
@@ -121,7 +118,17 @@ const scheduleReminder = async (
       updatedAt: now,
     };
 
-    await persistReminderRecords([...recordsWithoutExisting, record]);
+    try {
+      await persistReminderRecords([
+        ...currentRecords.filter((item) => item.key !== key),
+        record,
+      ]);
+    } catch (persistError) {
+      await cancelHealthNotification(notificationId).catch(() => undefined);
+      throw persistError;
+    }
+
+    await cancelExistingReminder(key, currentRecords);
 
     return { ok: true, record };
   } catch {
@@ -198,6 +205,37 @@ export const scheduleHabitReminder = async (habit: Habit): Promise<ReminderSched
   });
 };
 
+export const scheduleCustomRoutineReminder = async (
+  routine: CustomHealthRoutine,
+): Promise<ReminderScheduleResult> => {
+  const parsed = routine.reminderTime ? parseMedicationReminderTime(routine.reminderTime) : null;
+  if (!parsed) {
+    return {
+      ok: false,
+      status: "error",
+      message: "Please choose a valid reminder time.",
+    };
+  }
+
+  const result = await scheduleReminder({
+    kind: routine.type,
+    sourceId: routine.id,
+    title: "Custom wellness routine",
+    hour: parsed.hour,
+    minute: parsed.minute,
+  });
+
+  if (
+    result.ok &&
+    routine.reminderNotificationId &&
+    routine.reminderNotificationId !== result.record.notificationId
+  ) {
+    await cancelHealthNotification(routine.reminderNotificationId).catch(() => undefined);
+  }
+
+  return result;
+};
+
 export const scheduleHydrationReminder = async (): Promise<ReminderScheduleResult> =>
   scheduleReminder({
     kind: "hydration",
@@ -219,6 +257,21 @@ export const cancelScheduledReminder = async (key: string): Promise<void> => {
     }
   }
 
+  await persistReminderRecords(records.filter((record) => record.key !== key));
+};
+
+export const cancelCustomRoutineReminder = async (routine: CustomHealthRoutine): Promise<void> => {
+  const key = getReminderKey(routine.type, routine.id);
+  const records = await listScheduledReminders();
+  const storedRecord = records.find((record) => record.key === key);
+  const notificationIds = Array.from(new Set([
+    storedRecord?.notificationId,
+    routine.reminderNotificationId,
+  ].filter((value): value is string => Boolean(value))));
+
+  await Promise.all(notificationIds.map(async (notificationId) => {
+    await cancelHealthNotification(notificationId).catch(() => undefined);
+  }));
   await persistReminderRecords(records.filter((record) => record.key !== key));
 };
 

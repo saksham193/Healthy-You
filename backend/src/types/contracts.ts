@@ -137,6 +137,14 @@ export const nutritionImageAnalysisResponseSchema = z.object({
   requiresReview: z.literal(true),
 }).strict();
 
+export const attachmentAnalysisResponseSchema = z.object({
+  summary: z.string().min(1).max(2000),
+  safetyNote: z.string().min(1).max(400),
+  fileName: z.string().min(1).max(160).optional(),
+  fileType: z.string().min(1).max(120).optional(),
+  limitations: z.array(z.string().min(1).max(240)).min(1).max(6),
+}).strict();
+
 export const registerSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1).max(120),
@@ -273,6 +281,7 @@ export const healthSummarySchema = z.object({
 export type BackendAIRequest = z.infer<typeof aiRequestSchema>;
 export type BackendAIResponse = z.infer<typeof aiResponseSchema>;
 export type BackendNutritionImageAnalysisResponse = z.infer<typeof nutritionImageAnalysisResponseSchema>;
+export type BackendAttachmentAnalysisResponse = z.infer<typeof attachmentAnalysisResponseSchema>;
 export type RegisterBody = z.infer<typeof registerSchema>;
 export type LoginBody = z.infer<typeof loginSchema>;
 export type RefreshTokenBody = z.infer<typeof refreshTokenSchema>;

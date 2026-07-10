@@ -160,6 +160,7 @@ export default function ProfileScreen() {
   const medicationLogs = useScheduleStore((state) => state.medicationLogs);
   const hydrateSchedule = useScheduleStore((state) => state.hydrate);
   const clearSchedule = useScheduleStore((state) => state.clearAll);
+  const disableAllCustomRoutineReminders = useScheduleStore((state) => state.disableAllCustomRoutineReminders);
   const [editVisible, setEditVisible] = useState(false);
   const [draft, setDraft] = useState<ProfileDraft>(emptyDraft);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -439,8 +440,12 @@ export default function ProfileScreen() {
           onPress: () => {
             setClearingReminders(true);
             void cancelAllHealthReminders()
-              .then((count) => {
+              .then(async (count) => {
+                await disableAllCustomRoutineReminders();
                 Alert.alert("Reminders cleared", `${count} local reminder${count === 1 ? "" : "s"} removed.`);
+              })
+              .catch(() => {
+                Alert.alert("Unable to clear reminders", "Healthy You could not clear all local reminders right now.");
               })
               .finally(() => {
                 setClearingReminders(false);

@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import type {
+  CustomHealthRoutine,
+  CustomHealthRoutineType,
   HabitCompletionEntry,
   MedicationLogEntry,
   MedicationLogStatus,
@@ -23,9 +25,20 @@ type MedicationLogInput = {
   loggedAt?: string;
 };
 
+export type CustomRoutineInput = {
+  type: CustomHealthRoutineType;
+  name: string;
+  notes?: string;
+  doseLabel?: string;
+  reminderEnabled: boolean;
+  reminderTime?: string;
+  reminderNotificationId?: string;
+};
+
 type ScheduleStoreState = {
   habitCompletions: HabitCompletionEntry[];
   medicationLogs: MedicationLogEntry[];
+  customRoutines: CustomHealthRoutine[];
   hydrated: boolean;
   error: string | null;
   hydrate: () => Promise<void>;
@@ -33,12 +46,17 @@ type ScheduleStoreState = {
   uncompleteHabit: (habitId: string, dateKey?: string) => Promise<void>;
   logMedication: (log: MedicationLogInput) => Promise<MedicationLogEntry>;
   clearMedicationLog: (medicationId: string, dateKey?: string) => Promise<void>;
+  addCustomRoutine: (routine: CustomRoutineInput) => Promise<CustomHealthRoutine>;
+  updateCustomRoutine: (id: string, routine: CustomRoutineInput) => Promise<CustomHealthRoutine | null>;
+  deleteCustomRoutine: (id: string) => Promise<void>;
+  disableAllCustomRoutineReminders: () => Promise<void>;
   clearAll: () => Promise<void>;
 };
 
 type PersistedScheduleState = {
   habitCompletions: HabitCompletionEntry[];
   medicationLogs: MedicationLogEntry[];
+  customRoutines: CustomHealthRoutine[];
 };
 
 const STORAGE_KEY = "healthy-you.schedule.local-v1";
@@ -77,6 +95,22 @@ const isMedicationLog = (value: unknown): value is MedicationLogEntry =>
   typeof value.loggedAt === "string" &&
   typeof value.dateKey === "string";
 
+const isCustomRoutineType = (value: unknown): value is CustomHealthRoutineType =>
+  value === "medication" || value === "habit";
+
+const isCustomHealthRoutine = (value: unknown): value is CustomHealthRoutine =>
+  isRecord(value) &&
+  typeof value.id === "string" &&
+  isCustomRoutineType(value.type) &&
+  typeof value.name === "string" &&
+  typeof value.reminderEnabled === "boolean" &&
+  typeof value.createdAt === "string" &&
+  typeof value.updatedAt === "string" &&
+  (value.notes === undefined || typeof value.notes === "string") &&
+  (value.doseLabel === undefined || typeof value.doseLabel === "string") &&
+  (value.reminderTime === undefined || typeof value.reminderTime === "string") &&
+  (value.reminderNotificationId === undefined || typeof value.reminderNotificationId === "string");
+
 const normalizeHabitCompletion = (
   completion: HabitCompletionInput,
   existingId?: string,
@@ -114,14 +148,36 @@ const normalizeMedicationLog = (
   };
 };
 
+const normalizeCustomRoutine = (
+  routine: CustomRoutineInput,
+  existing?: CustomHealthRoutine,
+): CustomHealthRoutine => {
+  const now = new Date().toISOString();
+
+  return {
+    id: existing?.id ?? createId("routine"),
+    type: routine.type,
+    name: routine.name.trim(),
+    notes: routine.notes?.trim() || undefined,
+    doseLabel: routine.type === "medication" ? routine.doseLabel?.trim() || undefined : undefined,
+    reminderEnabled: routine.reminderEnabled,
+    reminderTime: routine.reminderTime?.trim() || undefined,
+    reminderNotificationId: routine.reminderEnabled
+      ? routine.reminderNotificationId?.trim() || undefined
+      : undefined,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+};
+
 const loadPersistedState = async (): Promise<PersistedScheduleState> => {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
 
-  if (!raw) return { habitCompletions: [], medicationLogs: [] };
+  if (!raw) return { habitCompletions: [], medicationLogs: [], customRoutines: [] };
 
   const parsed: unknown = JSON.parse(raw);
 
-  if (!isRecord(parsed)) return { habitCompletions: [], medicationLogs: [] };
+  if (!isRecord(parsed)) return { habitCompletions: [], medicationLogs: [], customRoutines: [] };
 
   return {
     habitCompletions: Array.isArray(parsed.habitCompletions)
@@ -129,6 +185,9 @@ const loadPersistedState = async (): Promise<PersistedScheduleState> => {
       : [],
     medicationLogs: Array.isArray(parsed.medicationLogs)
       ? parsed.medicationLogs.filter(isMedicationLog)
+      : [],
+    customRoutines: Array.isArray(parsed.customRoutines)
+      ? parsed.customRoutines.filter(isCustomHealthRoutine)
       : [],
   };
 };
@@ -140,6 +199,7 @@ const savePersistedState = async (state: PersistedScheduleState): Promise<void> 
 export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
   habitCompletions: [],
   medicationLogs: [],
+  customRoutines: [],
   hydrated: false,
   error: null,
   hydrate: async () => {
@@ -168,6 +228,7 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
         ...get().habitCompletions.filter((item) => item.id !== existing?.id),
       ],
       medicationLogs: get().medicationLogs,
+      customRoutines: get().customRoutines,
     };
 
     set({ habitCompletions: next.habitCompletions, error: null });
@@ -180,6 +241,7 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
         (completion) => completion.habitId !== habitId || completion.dateKey !== dateKey,
       ),
       medicationLogs: get().medicationLogs,
+      customRoutines: get().customRoutines,
     };
 
     set({ habitCompletions: next.habitCompletions, error: null });
@@ -197,6 +259,7 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
         nextLog,
         ...get().medicationLogs.filter((item) => item.id !== existing?.id),
       ],
+      customRoutines: get().customRoutines,
     };
 
     set({ medicationLogs: next.medicationLogs, error: null });
@@ -209,15 +272,75 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
       medicationLogs: get().medicationLogs.filter(
         (log) => log.medicationId !== medicationId || log.dateKey !== dateKey,
       ),
+      customRoutines: get().customRoutines,
     };
 
     set({ medicationLogs: next.medicationLogs, error: null });
     await savePersistedState(next);
   },
-  clearAll: async () => {
-    const next = { habitCompletions: [], medicationLogs: [] };
+  addCustomRoutine: async (routine) => {
+    const nextRoutine = normalizeCustomRoutine(routine);
+    const next = {
+      habitCompletions: get().habitCompletions,
+      medicationLogs: get().medicationLogs,
+      customRoutines: [nextRoutine, ...get().customRoutines],
+    };
 
-    set({ ...next, error: null });
+    set({ customRoutines: next.customRoutines, error: null });
+    await savePersistedState(next);
+    return nextRoutine;
+  },
+  updateCustomRoutine: async (id, routine) => {
+    const existing = get().customRoutines.find((item) => item.id === id);
+    if (!existing) return null;
+
+    const nextRoutine = normalizeCustomRoutine(routine, existing);
+    const next = {
+      habitCompletions: get().habitCompletions,
+      medicationLogs: get().medicationLogs,
+      customRoutines: get().customRoutines.map((item) => item.id === id ? nextRoutine : item),
+    };
+
+    set({ customRoutines: next.customRoutines, error: null });
+    await savePersistedState(next);
+    return nextRoutine;
+  },
+  deleteCustomRoutine: async (id) => {
+    const next = {
+      habitCompletions: get().habitCompletions,
+      medicationLogs: get().medicationLogs,
+      customRoutines: get().customRoutines.filter((item) => item.id !== id),
+    };
+
+    set({ customRoutines: next.customRoutines, error: null });
+    await savePersistedState(next);
+  },
+  disableAllCustomRoutineReminders: async () => {
+    const now = new Date().toISOString();
+    const next = {
+      habitCompletions: get().habitCompletions,
+      medicationLogs: get().medicationLogs,
+      customRoutines: get().customRoutines.map((routine) => routine.reminderEnabled
+        ? {
+            ...routine,
+            reminderEnabled: false,
+            reminderNotificationId: undefined,
+            updatedAt: now,
+          }
+        : routine),
+    };
+
+    set({ customRoutines: next.customRoutines, error: null });
+    await savePersistedState(next);
+  },
+  clearAll: async () => {
+    const next = {
+      habitCompletions: [],
+      medicationLogs: [],
+      customRoutines: get().customRoutines,
+    };
+
+    set({ habitCompletions: [], medicationLogs: [], error: null });
     await savePersistedState(next);
   },
 }));

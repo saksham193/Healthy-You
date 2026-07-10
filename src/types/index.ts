@@ -279,6 +279,21 @@ export type MedicationLogEntry = {
   dateKey: string;
 };
 
+export type CustomHealthRoutineType = "medication" | "habit";
+
+export type CustomHealthRoutine = {
+  id: string;
+  type: CustomHealthRoutineType;
+  name: string;
+  notes?: string;
+  doseLabel?: string;
+  reminderEnabled: boolean;
+  reminderTime?: string;
+  reminderNotificationId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SleepSchedule = {
   bedtime: string;
   wakeTime: string;

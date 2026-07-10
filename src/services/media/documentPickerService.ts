@@ -1,12 +1,13 @@
 import * as DocumentPicker from "expo-document-picker";
 import type { MediaPickerResult, PickedAttachment } from "./mediaTypes";
 
-const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const MAX_TEXT_ATTACHMENT_BYTES = 1 * 1024 * 1024;
+const MAX_PDF_ATTACHMENT_BYTES = 3 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
   "application/pdf",
+  "application/json",
+  "text/csv",
+  "text/markdown",
   "text/plain",
 ];
 
@@ -46,11 +47,15 @@ export const pickMedibotAttachment = async (): Promise<MediaPickerResult<PickedA
       };
     }
 
-    if (asset.size && asset.size > MAX_ATTACHMENT_BYTES) {
+    const maxBytes = mimeType === "application/pdf" ? MAX_PDF_ATTACHMENT_BYTES : MAX_TEXT_ATTACHMENT_BYTES;
+
+    if (asset.size && asset.size > maxBytes) {
       return {
         ok: false,
         reason: "too-large",
-        message: "This file is too large for the beta attachment flow. Please keep attachments under 5 MB.",
+        message: mimeType === "application/pdf"
+          ? "This PDF is too large for the beta attachment flow. Please keep PDFs under 3 MB."
+          : "This file is too large for attachment analysis. Please keep text-like files under 1 MB.",
       };
     }
 

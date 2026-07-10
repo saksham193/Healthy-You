@@ -1,12 +1,17 @@
 export type VoiceInputFoundationStatus = {
   available: false;
+  state: "unavailable";
   title: string;
   message: string;
+  safetyNote: string;
 };
 
 export const getVoiceInputFoundationStatus = (): VoiceInputFoundationStatus => ({
   available: false,
-  title: "Voice transcription deferred",
+  state: "unavailable",
+  title: "Voice input",
   message:
-    "Healthy You has not enabled a validated speech-to-text package or secure transcription endpoint yet. Please type your Medibot message for now.",
+    "Voice input is not available in this build. You can continue typing your message.",
+  safetyNote:
+    "Healthy You will not record audio, upload audio, or send a transcript automatically.",
 });
