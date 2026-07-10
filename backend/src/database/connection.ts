@@ -80,6 +80,22 @@ export function initializeDatabase(): void {
       PRIMARY KEY (id, user_id),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS sync_entities (
+      user_id TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      sync_item_id TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      payload_json TEXT,
+      local_updated_at TEXT NOT NULL,
+      queued_at TEXT NOT NULL,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      server_updated_at TEXT NOT NULL,
+      deleted_at TEXT,
+      PRIMARY KEY (user_id, entity_type, entity_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
 
   const memoryColumns = database.pragma("table_info(memories)") as Array<{ name: string }>;

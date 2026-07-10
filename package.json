@@ -53,6 +53,7 @@
     "start": "expo start",
     "backend:build": "tsc -p backend/tsconfig.json",
     "backend:start": "node backend/dist/server.js",
+    "backend:smoke:sync": "node scripts/smoke-sync-endpoints.js",
     "build": "tsc -p tsconfig.json && tsc -p backend/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p backend/tsconfig.json --noEmit",
     "release:export": "expo export --platform web",

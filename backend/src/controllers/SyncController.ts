@@ -13,10 +13,16 @@ export class SyncController {
   constructor(private readonly sync = new SyncService()) {}
 
   push = (request: Request<Record<string, never>, unknown, SyncPushRequest>, response: Response): void => {
-    response.status(501).json({ data: this.sync.push(getUserId(request), request.body) });
+    response.json({ data: this.sync.push(getUserId(request), request.body) });
   };
 
   pull = (request: Request, response: Response): void => {
-    response.status(501).json({ data: this.sync.pull(getUserId(request)) });
+    const updatedAfter = typeof request.query.updatedAfter === "string" ? request.query.updatedAfter : undefined;
+
+    if (updatedAfter && Number.isNaN(Date.parse(updatedAfter))) {
+      throw new HttpError(400, "invalid_sync_cursor", "updatedAfter must be a valid ISO date string.");
+    }
+
+    response.json({ data: this.sync.pull(getUserId(request), updatedAfter) });
   };
 }

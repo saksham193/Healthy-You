@@ -303,6 +303,8 @@ export const syncPushRequestSchema = z.object({
 }).strict();
 
 export const syncStatusSchema = z.enum(["accepted", "conflict", "rejected", "not_enabled"]);
+export const syncPushStatusSchema = z.enum(["ok", "partial", "not_enabled"]);
+export const syncPullStatusSchema = z.enum(["ok", "not_enabled"]);
 
 export const syncResponseSchema = z.object({
   status: syncStatusSchema,
@@ -315,16 +317,17 @@ export const syncResponseSchema = z.object({
 }).strict();
 
 export const syncPushResponseSchema = z.object({
-  status: z.literal("not_enabled"),
-  code: z.literal("sync_not_enabled"),
-  message: z.string().min(1).max(240),
+  status: syncPushStatusSchema,
+  code: z.literal("sync_not_enabled").optional(),
+  message: z.string().min(1).max(240).optional(),
   results: z.array(syncResponseSchema),
+  serverUpdatedAt: isoDateString.optional(),
 }).strict();
 
 export const syncPullResponseSchema = z.object({
-  status: z.literal("not_enabled"),
-  code: z.literal("sync_not_enabled"),
-  message: z.string().min(1).max(240),
+  status: syncPullStatusSchema,
+  code: z.literal("sync_not_enabled").optional(),
+  message: z.string().min(1).max(240).optional(),
   items: z.array(syncQueueItemSchema),
   serverUpdatedAt: isoDateString,
 }).strict();

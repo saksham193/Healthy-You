@@ -34,16 +34,17 @@ export type SyncPushRequest = {
 };
 
 export type SyncPushResponse = {
-  status: "not_enabled";
-  code: "sync_not_enabled";
-  message: string;
+  status: "ok" | "partial" | "not_enabled";
+  code?: "sync_not_enabled";
+  message?: string;
   results: SyncResponse[];
+  serverUpdatedAt?: string;
 };
 
 export type SyncPullResponse = {
-  status: "not_enabled";
-  code: "sync_not_enabled";
-  message: string;
+  status: "ok" | "not_enabled";
+  code?: "sync_not_enabled";
+  message?: string;
   items: SyncQueueItem[];
   serverUpdatedAt: string;
 };
