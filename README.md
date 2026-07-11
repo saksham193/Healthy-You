@@ -127,8 +127,9 @@ node scripts/validate-ai-quality.js
 - Phase 6D adds conflict review UI plus broader safe entity queue wiring for manual sync; Android runtime QA passed.
 - Phase 6E adds export/deletion boundary hardening, local sync queue clearing, and backend cloud sync metadata export/delete controls; Android runtime QA passed.
 - Phase 6F closed consolidated Android QA and release closure after the RC2 fitness/See All fix pass resolved the P1 blocker.
-- Phase 7A prepares production backend and monitoring readiness planning; no Phase 7 runtime code has been implemented yet.
-- Phase 7B will focus on production database and migration hardening.
+- Phase 7A completed production backend and monitoring readiness planning.
+- Phase 7B adds production database and migration hardening for the backend SQLite persistence layer.
+- Phase 7C will focus on rate limiting and request hardening.
 
 ## Tech Stack
 

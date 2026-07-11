@@ -52,7 +52,10 @@
   "scripts": {
     "start": "expo start",
     "backend:build": "tsc -p backend/tsconfig.json",
+    "backend:migrate": "npm run backend:build && node backend/dist/database/migrateCli.js apply",
+    "backend:migrate:status": "npm run backend:build && node backend/dist/database/migrateCli.js status",
     "backend:start": "node backend/dist/server.js",
+    "backend:smoke:migrations": "npm run backend:build && node scripts/smoke-migrations.js",
     "backend:smoke:sync": "node scripts/smoke-sync-endpoints.js",
     "build": "tsc -p tsconfig.json && tsc -p backend/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p backend/tsconfig.json --noEmit",
