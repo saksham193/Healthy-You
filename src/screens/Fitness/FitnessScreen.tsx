@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import CustomCard from "../../components/common/CustomCard";
@@ -24,7 +24,7 @@ import { getLocalDateKey, getWeekStartDateKey, useFitnessStore } from "../../sto
 import { COLORS, FITNESS_COLORS } from "../../theme/colors";
 import { SPACING } from "../../theme/spacing";
 import { TYPOGRAPHY } from "../../theme/typography";
-import type { ExerciseCategory, FitnessWorkoutCompletionEntry, RootTabParamList, WorkoutPlan } from "../../types";
+import type { ExerciseCategory, FitnessPreferences, FitnessWorkoutCompletionEntry, RootTabParamList, WorkoutPlan } from "../../types";
 import { getFitnessToneColors } from "../../utils/tone";
 
 type WorkoutTemplate = WorkoutPlan & {
@@ -32,10 +32,65 @@ type WorkoutTemplate = WorkoutPlan & {
   categoryTitle: string;
   durationMinutes: number;
   estimatedCalories: number;
+  intensity: "low" | "moderate" | "high";
+  isRestrictedForUser: boolean;
 };
 type FitnessScreenProps = BottomTabScreenProps<RootTabParamList, "Fitness">;
+type WorkoutCategory = NonNullable<WorkoutPlan["category"]>;
+type WorkoutIntensity = NonNullable<WorkoutPlan["intensity"]>;
+type PlanFormState = {
+  name: string;
+  category: WorkoutCategory;
+  durationMinutes: string;
+  intensity: WorkoutIntensity;
+  bodyFocus: string;
+  equipment: string;
+  notes: string;
+  userRestrictions: string;
+};
+type ExerciseLogFormState = {
+  name: string;
+  category: WorkoutCategory;
+  durationMinutes: string;
+  intensity: WorkoutIntensity;
+  caloriesEstimate: string;
+  notes: string;
+  completedAt: string;
+};
 
 const AI_FITNESS_COACH_PROMPT = "Act as my wellness fitness coach. Suggest a safe workout plan based on my recent activity and completed workouts. Keep it practical and avoid medical claims.";
+const FITNESS_SAFETY_COPY = "Fitness preferences are stored locally and help personalize your workout list. They are not medical advice. If you have an injury, condition, or medical restriction, consult a qualified professional before exercising.";
+const emptyPlanForm: PlanFormState = {
+  name: "",
+  category: "custom",
+  durationMinutes: "20",
+  intensity: "moderate",
+  bodyFocus: "",
+  equipment: "",
+  notes: "",
+  userRestrictions: "",
+};
+const emptyExerciseLogForm: ExerciseLogFormState = {
+  name: "",
+  category: "custom",
+  durationMinutes: "20",
+  intensity: "moderate",
+  caloriesEstimate: "",
+  notes: "",
+  completedAt: "",
+};
+const workoutCategories: Array<{ label: string; value: WorkoutCategory }> = [
+  { label: "Strength", value: "strength" },
+  { label: "Cardio", value: "cardio" },
+  { label: "Mobility", value: "mobility" },
+  { label: "Recovery", value: "recovery" },
+  { label: "Custom", value: "custom" },
+];
+const workoutIntensities: Array<{ label: string; value: WorkoutIntensity }> = [
+  { label: "Low", value: "low" },
+  { label: "Moderate", value: "moderate" },
+  { label: "High", value: "high" },
+];
 
 const clampPercent = (value: number): number => Math.max(0, Math.min(100, value));
 
@@ -64,13 +119,98 @@ const caloriesPerMinuteFor = (difficulty: string): number => {
   return 6;
 };
 
+const difficultyForIntensity = (intensity: WorkoutIntensity): string => {
+  switch (intensity) {
+    case "high":
+      return "High";
+    case "low":
+      return "Low";
+    case "moderate":
+    default:
+      return "Moderate";
+  }
+};
+
+const categoryTitleFor = (category: WorkoutCategory): string => {
+  switch (category) {
+    case "strength":
+      return "Strength Training";
+    case "cardio":
+      return "Cardio";
+    case "mobility":
+      return "Mobility";
+    case "recovery":
+      return "Recovery";
+    case "custom":
+    default:
+      return "Custom";
+  }
+};
+
+const categoryIdForPlanCategory = (category?: WorkoutCategory): string | null => {
+  switch (category) {
+    case "strength":
+      return "strength-training";
+    case "cardio":
+      return "cardio";
+    case "mobility":
+      return "mobility";
+    case "recovery":
+      return "yoga";
+    case "custom":
+    default:
+      return null;
+  }
+};
+
+const parseList = (value: string): string[] =>
+  value.split(",").map((item) => item.trim()).filter(Boolean);
+
+const normalizeToken = (value: string): string => value.trim().toLowerCase();
+
+const hasRestrictionMatch = (planRestrictions: string[] | undefined, preferences: FitnessPreferences): boolean => {
+  const preferenceTokens = [
+    ...preferences.limitations,
+    ...(preferences.restrictionNotes ? parseList(preferences.restrictionNotes) : []),
+  ].map(normalizeToken).filter(Boolean);
+
+  if (!planRestrictions?.length || preferenceTokens.length === 0) return false;
+
+  return planRestrictions.some((restriction) => {
+    const normalized = normalizeToken(restriction);
+
+    return preferenceTokens.some((token) => normalized.includes(token) || token.includes(normalized));
+  });
+};
+
+const formatElapsed = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const remainingSeconds = (seconds % 60).toString().padStart(2, "0");
+
+  return `${minutes}:${remainingSeconds}`;
+};
+
+const parseCompletedAtInput = (value: string): string | null => {
+  if (!value.trim()) return new Date().toISOString();
+
+  const date = new Date(value.trim());
+
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
 const templateForWorkout = (
   workout: WorkoutPlan,
   categories: ExerciseCategory[],
+  preferences: FitnessPreferences,
 ): WorkoutTemplate => {
-  const categoryId = categoryIdForWorkout(workout);
+  const categoryId = categoryIdForPlanCategory(workout.category) ?? categoryIdForWorkout(workout);
   const category = categories.find((item) => item.id === categoryId) ?? categories[0];
-  const durationMinutes = durationMinutesFor(workout.duration);
+  const durationMinutes = workout.durationMinutes ?? durationMinutesFor(workout.duration);
+  const intensity = workout.intensity ?? (workout.difficulty.toLowerCase().includes("high")
+    ? "high"
+    : workout.difficulty.toLowerCase().includes("easy") || workout.difficulty.toLowerCase().includes("low")
+      ? "low"
+      : "moderate");
 
   return {
     ...workout,
@@ -78,6 +218,8 @@ const templateForWorkout = (
     categoryTitle: category?.title ?? "Workout",
     durationMinutes,
     estimatedCalories: durationMinutes * caloriesPerMinuteFor(workout.difficulty),
+    intensity,
+    isRestrictedForUser: hasRestrictionMatch(workout.userRestrictions, preferences),
   };
 };
 
@@ -91,25 +233,69 @@ const completedTimeLabel = (completedAt: string): string => {
 
 export default function FitnessScreen({ navigation }: FitnessScreenProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [workoutActionNotice, setWorkoutActionNotice] = useState<string | null>(null);
+  const [workoutPickerVisible, setWorkoutPickerVisible] = useState(false);
+  const [timerVisible, setTimerVisible] = useState(false);
+  const [activeWorkout, setActiveWorkout] = useState<WorkoutTemplate | null>(null);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [logModalVisible, setLogModalVisible] = useState(false);
+  const [exerciseLogForm, setExerciseLogForm] = useState<ExerciseLogFormState>(emptyExerciseLogForm);
+  const [planModalVisible, setPlanModalVisible] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<WorkoutPlan | null>(null);
+  const [planForm, setPlanForm] = useState<PlanFormState>(emptyPlanForm);
+  const [preferencesForm, setPreferencesForm] = useState({
+    bodyType: "",
+    goals: "",
+    limitations: "",
+    restrictionNotes: "",
+    hideRestrictedWorkouts: false,
+  });
   const { data, error, loading } = useHealthData();
   const fitness = data.fitness;
   const hydrateFitness = useFitnessStore((state) => state.hydrate);
   const completions = useFitnessStore((state) => state.completions);
+  const customWorkoutPlans = useFitnessStore((state) => state.customWorkoutPlans);
+  const fitnessPreferences = useFitnessStore((state) => state.preferences);
   const fitnessHydrated = useFitnessStore((state) => state.hydrated);
   const completeWorkout = useFitnessStore((state) => state.completeWorkout);
   const deleteCompletion = useFitnessStore((state) => state.deleteCompletion);
+  const addCustomWorkoutPlan = useFitnessStore((state) => state.addCustomWorkoutPlan);
+  const updateCustomWorkoutPlan = useFitnessStore((state) => state.updateCustomWorkoutPlan);
+  const deleteCustomWorkoutPlan = useFitnessStore((state) => state.deleteCustomWorkoutPlan);
+  const updatePreferences = useFitnessStore((state) => state.updatePreferences);
 
   useEffect(() => {
     void hydrateFitness();
   }, [hydrateFitness]);
 
+  useEffect(() => {
+    setPreferencesForm({
+      bodyType: fitnessPreferences.bodyType ?? "",
+      goals: fitnessPreferences.goals.join(", "),
+      limitations: fitnessPreferences.limitations.join(", "),
+      restrictionNotes: fitnessPreferences.restrictionNotes ?? "",
+      hideRestrictedWorkouts: fitnessPreferences.hideRestrictedWorkouts,
+    });
+  }, [fitnessPreferences]);
+
+  useEffect(() => {
+    if (!timerRunning) return undefined;
+
+    const interval = setInterval(() => {
+      setElapsedSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timerRunning]);
+
   const todayKey = getLocalDateKey();
   const weekStartKey = getWeekStartDateKey();
   const workoutTemplates = useMemo(
-    () => fitness?.workoutPlans.map((workout) =>
-      templateForWorkout(workout, fitness.exerciseCategories),
+    () => [...(fitness?.workoutPlans ?? []), ...customWorkoutPlans].map((workout) =>
+      templateForWorkout(workout, fitness?.exerciseCategories ?? [], fitnessPreferences),
     ) ?? [],
-    [fitness],
+    [customWorkoutPlans, fitness, fitnessPreferences],
   );
   const todayCompletions = useMemo(
     () => completions.filter((completion) => completion.dateKey === todayKey),
@@ -133,10 +319,16 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
     return byWorkout;
   }, [todayCompletions]);
   const filteredWorkoutTemplates = useMemo(
-    () => selectedCategoryId
-      ? workoutTemplates.filter((workout) => workout.categoryId === selectedCategoryId)
-      : workoutTemplates,
-    [selectedCategoryId, workoutTemplates],
+    () => {
+      const visibleWorkouts = fitnessPreferences.hideRestrictedWorkouts
+        ? workoutTemplates.filter((workout) => !workout.isRestrictedForUser)
+        : workoutTemplates;
+
+      return selectedCategoryId
+        ? visibleWorkouts.filter((workout) => workout.categoryId === selectedCategoryId)
+        : visibleWorkouts;
+    },
+    [fitnessPreferences.hideRestrictedWorkouts, selectedCategoryId, workoutTemplates],
   );
   const manualActiveMinutesToday = todayCompletions.reduce(
     (sum, completion) => sum + completion.durationMinutes,
@@ -149,7 +341,6 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
   const manualWorkoutProgress = workoutTemplates.length > 0
     ? clampPercent(Math.round((todayCompletionByWorkoutId.size / workoutTemplates.length) * 100))
     : 0;
-
   if (!fitness) {
     return (
       <ScreenContainer>
@@ -202,25 +393,70 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
   const manualCaloriesProgress = summary.calorieGoal > 0
     ? clampPercent(Math.round((manualCaloriesToday / summary.calorieGoal) * 100))
     : 0;
+  const openWorkoutPicker = () => {
+    setWorkoutActionNotice(null);
+    setWorkoutPickerVisible(true);
+  };
+  const openManualLog = (preset?: Partial<ExerciseLogFormState>) => {
+    setExerciseLogForm({
+      ...emptyExerciseLogForm,
+      completedAt: new Date().toISOString(),
+      ...preset,
+    });
+    setLogModalVisible(true);
+  };
+  const openPlanModal = (plan?: WorkoutPlan | null) => {
+    const category = plan?.category ?? "custom";
+    const intensity = plan?.intensity ?? (plan?.difficulty.toLowerCase().includes("easy")
+      ? "low"
+      : plan?.difficulty.toLowerCase().includes("high")
+        ? "high"
+        : "moderate");
+    const durationMinutes = plan?.durationMinutes ?? (plan ? durationMinutesFor(plan.duration) : 20);
+
+    setEditingPlan(plan?.isCustom ? plan : null);
+    setPlanForm(plan
+      ? {
+          name: plan.isCustom ? plan.name : `${plan.name} Custom`,
+          category,
+          durationMinutes: `${Math.max(1, durationMinutes)}`,
+          intensity,
+          bodyFocus: plan.bodyFocus?.join(", ") ?? "",
+          equipment: plan.equipment ?? "",
+          notes: plan.notes ?? "",
+          userRestrictions: plan.userRestrictions?.join(", ") ?? "",
+        }
+      : emptyPlanForm);
+    setPlanModalVisible(true);
+  };
+  const closePlanModal = () => {
+    setPlanModalVisible(false);
+    setEditingPlan(null);
+    setPlanForm(emptyPlanForm);
+  };
+  const startTimerForWorkout = (workout: WorkoutTemplate) => {
+    setActiveWorkout(workout);
+    setElapsedSeconds(0);
+    setTimerRunning(false);
+    setWorkoutPickerVisible(false);
+    setTimerVisible(true);
+  };
+  const closeTimer = () => {
+    setTimerRunning(false);
+    setTimerVisible(false);
+    setActiveWorkout(null);
+    setElapsedSeconds(0);
+  };
   const handleFitnessAction = (title: string) => {
     const normalizedTitle = title.toLowerCase();
-    const firstOpenWorkout = workoutTemplates.find((workout) => !todayCompletionByWorkoutId.has(workout.id));
 
     if (normalizedTitle.includes("start")) {
-      setSelectedCategoryId(firstOpenWorkout?.categoryId ?? null);
-      Alert.alert(
-        "Workout plans ready",
-        "Choose one of today's workout cards and tap Complete when you finish. A live workout timer is coming after beta.",
-      );
+      openWorkoutPicker();
       return;
     }
 
     if (normalizedTitle.includes("log")) {
-      setSelectedCategoryId(firstOpenWorkout?.categoryId ?? null);
-      Alert.alert(
-        "Log exercise locally",
-        "Use the visible workout cards to add a completion to your local fitness log. Pick a plan and tap Complete.",
-      );
+      openManualLog();
       return;
     }
 
@@ -235,9 +471,10 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
     );
   };
   const handleWorkoutTimer = () => {
-    Alert.alert("Workout Timer", "Timer controls are ready for your next workout session.");
+    openWorkoutPicker();
   };
   const handleCategoryPress = (categoryId: string) => {
+    setWorkoutActionNotice(null);
     setSelectedCategoryId((current) => current === categoryId ? null : categoryId);
   };
   const handleCompleteWorkout = (workout: WorkoutTemplate) => {
@@ -254,8 +491,136 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
       durationMinutes: workout.durationMinutes,
       estimatedCalories: workout.estimatedCalories,
       difficulty: workout.difficulty,
+      notes: workout.notes,
     }).then(() => {
       Alert.alert("Workout complete", `${workout.name} was added to today's fitness log.`);
+    });
+  };
+  const handleCompleteActiveWorkout = () => {
+    if (!activeWorkout) return;
+
+    const loggedMinutes = Math.max(1, Math.round(elapsedSeconds / 60) || activeWorkout.durationMinutes);
+    setTimerRunning(false);
+    void completeWorkout({
+      workoutId: activeWorkout.id,
+      workoutName: activeWorkout.name,
+      categoryId: activeWorkout.categoryId,
+      categoryTitle: activeWorkout.categoryTitle,
+      durationMinutes: loggedMinutes,
+      estimatedCalories: loggedMinutes * caloriesPerMinuteFor(activeWorkout.difficulty),
+      difficulty: activeWorkout.difficulty,
+      notes: activeWorkout.notes,
+    }).then(() => {
+      closeTimer();
+      Alert.alert("Workout logged", `${activeWorkout.name} was saved to your local fitness log.`);
+    });
+  };
+  const handleSaveManualExercise = () => {
+    const name = exerciseLogForm.name.trim();
+    const durationMinutes = Number.parseInt(exerciseLogForm.durationMinutes, 10);
+    const caloriesEstimate = Number.parseInt(exerciseLogForm.caloriesEstimate, 10);
+    const completedAt = parseCompletedAtInput(exerciseLogForm.completedAt);
+
+    if (!name) {
+      Alert.alert("Exercise name needed", "Add an exercise name before saving.");
+      return;
+    }
+
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      Alert.alert("Duration needed", "Add duration in minutes before saving.");
+      return;
+    }
+
+    if (!completedAt) {
+      Alert.alert("Date/time invalid", "Use a valid date/time or leave the field blank to log now.");
+      return;
+    }
+
+    void completeWorkout({
+      workoutId: `manual-${Date.now()}`,
+      workoutName: name,
+      categoryId: categoryIdForPlanCategory(exerciseLogForm.category) ?? "custom",
+      categoryTitle: categoryTitleFor(exerciseLogForm.category),
+      durationMinutes,
+      estimatedCalories: Number.isFinite(caloriesEstimate)
+        ? Math.max(0, caloriesEstimate)
+        : durationMinutes * caloriesPerMinuteFor(difficultyForIntensity(exerciseLogForm.intensity)),
+      difficulty: difficultyForIntensity(exerciseLogForm.intensity),
+      completedAt,
+      notes: exerciseLogForm.notes,
+    }).then(() => {
+      setLogModalVisible(false);
+      Alert.alert("Exercise logged", `${name} was saved to your local fitness log.`);
+    }).catch(() => {
+      Alert.alert("Unable to log exercise", "Please check the date/time and try again.");
+    });
+  };
+  const handleSavePlan = () => {
+    const name = planForm.name.trim();
+    const durationMinutes = Number.parseInt(planForm.durationMinutes, 10);
+
+    if (!name) {
+      Alert.alert("Workout name needed", "Add a workout plan name before saving.");
+      return;
+    }
+
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      Alert.alert("Duration needed", "Add duration in minutes before saving.");
+      return;
+    }
+
+    const planInput = {
+      name,
+      category: planForm.category,
+      durationMinutes,
+      intensity: planForm.intensity,
+      bodyFocus: parseList(planForm.bodyFocus),
+      equipment: planForm.equipment,
+      notes: planForm.notes,
+      userRestrictions: parseList(planForm.userRestrictions),
+    };
+
+    if (editingPlan) {
+      void updateCustomWorkoutPlan(editingPlan.id, planInput).then(() => {
+        closePlanModal();
+        Alert.alert("Workout updated", `${name} has been updated.`);
+      });
+      return;
+    }
+
+    void addCustomWorkoutPlan(planInput).then(() => {
+      closePlanModal();
+      Alert.alert("Workout added", `${name} is now available in your local workout plans.`);
+    });
+  };
+  const handleDeletePlan = (plan: WorkoutPlan) => {
+    if (!plan.isCustom) {
+      openPlanModal(plan);
+      return;
+    }
+
+    Alert.alert("Delete workout plan", `Remove ${plan.name} from your local workout plans? This does not delete completed workout logs.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          void deleteCustomWorkoutPlan(plan.id).then(() => {
+            Alert.alert("Workout plan deleted", `${plan.name} was removed from local plans.`);
+          });
+        },
+      },
+    ]);
+  };
+  const handleSavePreferences = () => {
+    void updatePreferences({
+      bodyType: preferencesForm.bodyType,
+      goals: parseList(preferencesForm.goals),
+      limitations: parseList(preferencesForm.limitations),
+      restrictionNotes: preferencesForm.restrictionNotes,
+      hideRestrictedWorkouts: preferencesForm.hideRestrictedWorkouts,
+    }).then(() => {
+      Alert.alert("Preferences saved", "Fitness preferences were saved locally on this device.");
     });
   };
   const handleUndoWorkout = (completion: FitnessWorkoutCompletionEntry) => {
@@ -272,6 +637,28 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
       },
     ]);
   };
+  const quickActions = fitness.actions.length > 0 ? (
+    <View style={styles.actionsGrid}>
+      {fitness.actions.map((action) => (
+        <ActionCard
+          iconName={action.iconName}
+          key={action.id}
+          onPress={() => handleFitnessAction(action.title)}
+          title={action.title}
+          tone={action.tone}
+          toneColorsOverride={getFitnessToneColors(action.tone)}
+        />
+      ))}
+    </View>
+  ) : (
+    <CustomCard style={styles.emptyCard}>
+      <EmptyState
+        icon="flash-outline"
+        subtitle="Workout shortcuts will appear here."
+        title="No fitness actions"
+      />
+    </CustomCard>
+  );
 
   return (
     <ScreenContainer>
@@ -407,11 +794,80 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
             </View>
           </CustomCard>
 
+          <DashboardSection title="Quick Actions" />
+          {quickActions}
+
           <DashboardSection
-            actionLabel={selectedCategory ? "Clear" : "Start"}
-            onPress={selectedCategory ? () => setSelectedCategoryId(null) : undefined}
+            actionLabel="Save"
+            onPress={handleSavePreferences}
+            title="Fitness Preferences"
+          />
+          <CustomCard style={styles.preferencesCard}>
+            <Text style={styles.safetyText}>{FITNESS_SAFETY_COPY}</Text>
+            <TextInput
+              accessibilityLabel="Body type or fitness context"
+              onChangeText={(bodyType) => setPreferencesForm((current) => ({ ...current, bodyType }))}
+              placeholder="Body type or fitness context"
+              placeholderTextColor={COLORS.textMuted}
+              style={styles.input}
+              value={preferencesForm.bodyType}
+            />
+            <TextInput
+              accessibilityLabel="Fitness goals"
+              onChangeText={(goals) => setPreferencesForm((current) => ({ ...current, goals }))}
+              placeholder="Goals, comma separated"
+              placeholderTextColor={COLORS.textMuted}
+              style={styles.input}
+              value={preferencesForm.goals}
+            />
+            <TextInput
+              accessibilityLabel="Limitations or restrictions"
+              onChangeText={(limitations) => setPreferencesForm((current) => ({ ...current, limitations }))}
+              placeholder="Limitations/restrictions, comma separated"
+              placeholderTextColor={COLORS.textMuted}
+              style={styles.input}
+              value={preferencesForm.limitations}
+            />
+            <TextInput
+              accessibilityLabel="Restriction notes"
+              multiline
+              onChangeText={(restrictionNotes) => setPreferencesForm((current) => ({ ...current, restrictionNotes }))}
+              placeholder="Restriction notes stay local and only help filter your workout list."
+              placeholderTextColor={COLORS.textMuted}
+              style={[styles.input, styles.textArea]}
+              value={preferencesForm.restrictionNotes}
+            />
+            <View style={styles.switchRow}>
+              <View style={styles.switchCopy}>
+                <Text style={styles.switchTitle}>Hide workouts matching restriction notes</Text>
+                <Text style={styles.muted}>Uses only your local text labels. It does not determine medical safety.</Text>
+              </View>
+              <Switch
+                onValueChange={(hideRestrictedWorkouts) =>
+                  setPreferencesForm((current) => ({ ...current, hideRestrictedWorkouts }))}
+                value={preferencesForm.hideRestrictedWorkouts}
+              />
+            </View>
+          </CustomCard>
+
+          <DashboardSection
+            actionLabel={selectedCategory ? "Clear" : "Add Workout"}
+            onPress={selectedCategory
+              ? () => {
+                  setWorkoutActionNotice(null);
+                  setSelectedCategoryId(null);
+                }
+              : () => openPlanModal()}
             title="Today's Workout Plans"
           />
+          {workoutActionNotice ? (
+            <CustomCard style={styles.actionNoticeCard}>
+              <View style={styles.actionNoticeIcon}>
+                <Ionicons color={FITNESS_COLORS.primary} name="barbell-outline" size={18} />
+              </View>
+              <Text style={styles.actionNoticeText}>{workoutActionNotice}</Text>
+            </CustomCard>
+          ) : null}
           {selectedCategory ? (
             <CustomCard style={styles.filterCard}>
               <View style={styles.filterIcon}>
@@ -434,7 +890,11 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
                     isCompletedToday={Boolean(completion)}
                     key={workout.id}
                     onComplete={() => handleCompleteWorkout(workout)}
+                    onDelete={() => handleDeletePlan(workout)}
+                    onEdit={() => openPlanModal(workout)}
+                    onStart={() => startTimerForWorkout(workout)}
                     onUndoComplete={completion ? () => handleUndoWorkout(completion) : undefined}
+                    restrictionLabel={workout.isRestrictedForUser ? "Matches your restriction notes" : undefined}
                     workout={workout}
                   />
                 );
@@ -585,30 +1045,6 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
             </CustomCard>
           )}
 
-          <DashboardSection title="Quick Actions" />
-          {fitness.actions.length > 0 ? (
-            <View style={styles.actionsGrid}>
-              {fitness.actions.map((action) => (
-                <ActionCard
-                  iconName={action.iconName}
-                  key={action.id}
-                  onPress={() => handleFitnessAction(action.title)}
-                  title={action.title}
-                  tone={action.tone}
-                  toneColorsOverride={getFitnessToneColors(action.tone)}
-                />
-              ))}
-            </View>
-          ) : (
-            <CustomCard style={styles.emptyCard}>
-              <EmptyState
-                icon="flash-outline"
-                subtitle="Workout shortcuts will appear here."
-                title="No fitness actions"
-              />
-            </CustomCard>
-          )}
-
           <View style={styles.statsRow}>
             <StatsCard
               icon="flame-outline"
@@ -637,6 +1073,357 @@ export default function FitnessScreen({ navigation }: FitnessScreenProps) {
           </View>
         </ScreenSheet>
       </View>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setWorkoutPickerVisible(false)}
+        transparent
+        visible={workoutPickerVisible}
+      >
+        <View style={styles.modalBackdrop}>
+          <CustomCard style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.cardEyebrow}>Start Workout</Text>
+                <Text style={styles.modalTitle}>Choose a plan</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityLabel="Close workout picker"
+                accessibilityRole="button"
+                onPress={() => setWorkoutPickerVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons color={COLORS.text} name="close" size={20} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.safetyText}>{FITNESS_SAFETY_COPY}</Text>
+            <ScrollView style={styles.modalScroll}>
+              {filteredWorkoutTemplates.length > 0 ? filteredWorkoutTemplates.map((workout) => (
+                <TouchableOpacity
+                  accessibilityLabel={`Start ${workout.name}`}
+                  accessibilityRole="button"
+                  activeOpacity={0.82}
+                  key={workout.id}
+                  onPress={() => startTimerForWorkout(workout)}
+                  style={styles.pickerRow}
+                >
+                  <View style={styles.pickerIcon}>
+                    <Ionicons color={FITNESS_COLORS.primary} name={workout.iconName} size={18} />
+                  </View>
+                  <View style={styles.pickerCopy}>
+                    <Text style={styles.pickerTitle}>{workout.name}</Text>
+                    <Text style={styles.muted}>{workout.categoryTitle} - {workout.durationMinutes} min - {workout.difficulty}</Text>
+                    {workout.isRestrictedForUser ? (
+                      <Text style={styles.restrictionText}>Matches your local restriction notes.</Text>
+                    ) : null}
+                  </View>
+                  <Ionicons color={COLORS.textMuted} name="chevron-forward" size={18} />
+                </TouchableOpacity>
+              )) : (
+                <EmptyState
+                  icon="barbell-outline"
+                  subtitle="Add a local workout plan or clear filters to start a timer."
+                  title="No workout plans"
+                />
+              )}
+            </ScrollView>
+          </CustomCard>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        onRequestClose={closeTimer}
+        transparent
+        visible={timerVisible}
+      >
+        <View style={styles.modalBackdrop}>
+          <CustomCard style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.cardEyebrow}>Workout Timer</Text>
+                <Text style={styles.modalTitle}>{activeWorkout?.name ?? "Workout"}</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityLabel="Close workout timer"
+                accessibilityRole="button"
+                onPress={closeTimer}
+                style={styles.closeButton}
+              >
+                <Ionicons color={COLORS.text} name="close" size={20} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.timerValue}>{formatElapsed(elapsedSeconds)}</Text>
+            <Text style={styles.timerTarget}>Target: {activeWorkout?.durationMinutes ?? 0} min</Text>
+            <Text style={styles.safetyText}>Complete only when you are done. Closing or cancelling the timer will not log a workout.</Text>
+            <View style={styles.timerControls}>
+              <TouchableOpacity
+                accessibilityLabel={timerRunning ? "Pause workout timer" : elapsedSeconds > 0 ? "Resume workout timer" : "Start workout timer"}
+                accessibilityRole="button"
+                activeOpacity={0.82}
+                onPress={() => setTimerRunning((current) => !current)}
+                style={styles.primaryModalButton}
+              >
+                <Ionicons color={COLORS.white} name={timerRunning ? "pause" : "play"} size={18} />
+                <Text style={styles.primaryModalButtonText}>{timerRunning ? "Pause" : elapsedSeconds > 0 ? "Resume" : "Start"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityLabel="Reset workout timer"
+                accessibilityRole="button"
+                activeOpacity={0.76}
+                onPress={() => {
+                  setTimerRunning(false);
+                  setElapsedSeconds(0);
+                }}
+                style={styles.secondaryModalButton}
+              >
+                <Text style={styles.secondaryModalButtonText}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              accessibilityLabel="Complete workout"
+              accessibilityRole="button"
+              activeOpacity={0.82}
+              onPress={handleCompleteActiveWorkout}
+              style={styles.completeModalButton}
+            >
+              <Ionicons color={COLORS.white} name="checkmark-circle-outline" size={18} />
+              <Text style={styles.primaryModalButtonText}>Complete Workout</Text>
+            </TouchableOpacity>
+          </CustomCard>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setLogModalVisible(false)}
+        transparent
+        visible={logModalVisible}
+      >
+        <View style={styles.modalBackdrop}>
+          <CustomCard style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.cardEyebrow}>Manual Log</Text>
+                <Text style={styles.modalTitle}>Log Exercise</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityLabel="Close exercise log"
+                accessibilityRole="button"
+                onPress={() => setLogModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons color={COLORS.text} name="close" size={20} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScroll}>
+              <TextInput
+                accessibilityLabel="Exercise name"
+                onChangeText={(name) => setExerciseLogForm((current) => ({ ...current, name }))}
+                placeholder="Exercise name"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={exerciseLogForm.name}
+              />
+              <Text style={styles.formLabel}>Category</Text>
+              <View style={styles.chipRow}>
+                {workoutCategories.map((category) => (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    activeOpacity={0.76}
+                    key={category.value}
+                    onPress={() => setExerciseLogForm((current) => ({ ...current, category: category.value }))}
+                    style={[styles.choiceChip, exerciseLogForm.category === category.value && styles.choiceChipSelected]}
+                  >
+                    <Text style={[styles.choiceChipText, exerciseLogForm.category === category.value && styles.choiceChipTextSelected]}>
+                      {category.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.formLabel}>Intensity</Text>
+              <View style={styles.chipRow}>
+                {workoutIntensities.map((intensity) => (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    activeOpacity={0.76}
+                    key={intensity.value}
+                    onPress={() => setExerciseLogForm((current) => ({ ...current, intensity: intensity.value }))}
+                    style={[styles.choiceChip, exerciseLogForm.intensity === intensity.value && styles.choiceChipSelected]}
+                  >
+                    <Text style={[styles.choiceChipText, exerciseLogForm.intensity === intensity.value && styles.choiceChipTextSelected]}>
+                      {intensity.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                accessibilityLabel="Exercise duration minutes"
+                keyboardType="numeric"
+                onChangeText={(durationMinutes) => setExerciseLogForm((current) => ({ ...current, durationMinutes }))}
+                placeholder="Duration minutes"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={exerciseLogForm.durationMinutes}
+              />
+              <TextInput
+                accessibilityLabel="Calories estimate optional"
+                keyboardType="numeric"
+                onChangeText={(caloriesEstimate) => setExerciseLogForm((current) => ({ ...current, caloriesEstimate }))}
+                placeholder="Calories estimate (optional)"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={exerciseLogForm.caloriesEstimate}
+              />
+              <TextInput
+                accessibilityLabel="Exercise date time"
+                onChangeText={(completedAt) => setExerciseLogForm((current) => ({ ...current, completedAt }))}
+                placeholder="Date/time ISO, or leave blank for now"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={exerciseLogForm.completedAt}
+              />
+              <TextInput
+                accessibilityLabel="Exercise notes"
+                multiline
+                onChangeText={(notes) => setExerciseLogForm((current) => ({ ...current, notes }))}
+                placeholder="Notes (stored locally; not shown as medical advice)"
+                placeholderTextColor={COLORS.textMuted}
+                style={[styles.input, styles.textArea]}
+                value={exerciseLogForm.notes}
+              />
+            </ScrollView>
+            <TouchableOpacity
+              accessibilityLabel="Save exercise log"
+              accessibilityRole="button"
+              activeOpacity={0.82}
+              onPress={handleSaveManualExercise}
+              style={styles.primaryModalButton}
+            >
+              <Text style={styles.primaryModalButtonText}>Save Exercise</Text>
+            </TouchableOpacity>
+          </CustomCard>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        onRequestClose={closePlanModal}
+        transparent
+        visible={planModalVisible}
+      >
+        <View style={styles.modalBackdrop}>
+          <CustomCard style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.cardEyebrow}>{editingPlan ? "Edit Workout" : "Custom Workout"}</Text>
+                <Text style={styles.modalTitle}>{editingPlan ? "Update plan" : "Add plan"}</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityLabel="Close workout plan form"
+                accessibilityRole="button"
+                onPress={closePlanModal}
+                style={styles.closeButton}
+              >
+                <Ionicons color={COLORS.text} name="close" size={20} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.safetyText}>{FITNESS_SAFETY_COPY}</Text>
+            <ScrollView style={styles.modalScroll}>
+              <TextInput
+                accessibilityLabel="Workout plan name"
+                onChangeText={(name) => setPlanForm((current) => ({ ...current, name }))}
+                placeholder="Workout name"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={planForm.name}
+              />
+              <Text style={styles.formLabel}>Category</Text>
+              <View style={styles.chipRow}>
+                {workoutCategories.map((category) => (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    activeOpacity={0.76}
+                    key={category.value}
+                    onPress={() => setPlanForm((current) => ({ ...current, category: category.value }))}
+                    style={[styles.choiceChip, planForm.category === category.value && styles.choiceChipSelected]}
+                  >
+                    <Text style={[styles.choiceChipText, planForm.category === category.value && styles.choiceChipTextSelected]}>
+                      {category.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.formLabel}>Intensity</Text>
+              <View style={styles.chipRow}>
+                {workoutIntensities.map((intensity) => (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    activeOpacity={0.76}
+                    key={intensity.value}
+                    onPress={() => setPlanForm((current) => ({ ...current, intensity: intensity.value }))}
+                    style={[styles.choiceChip, planForm.intensity === intensity.value && styles.choiceChipSelected]}
+                  >
+                    <Text style={[styles.choiceChipText, planForm.intensity === intensity.value && styles.choiceChipTextSelected]}>
+                      {intensity.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                accessibilityLabel="Workout duration minutes"
+                keyboardType="numeric"
+                onChangeText={(durationMinutes) => setPlanForm((current) => ({ ...current, durationMinutes }))}
+                placeholder="Duration minutes"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={planForm.durationMinutes}
+              />
+              <TextInput
+                accessibilityLabel="Body focus"
+                onChangeText={(bodyFocus) => setPlanForm((current) => ({ ...current, bodyFocus }))}
+                placeholder="Body focus, comma separated"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={planForm.bodyFocus}
+              />
+              <TextInput
+                accessibilityLabel="Equipment"
+                onChangeText={(equipment) => setPlanForm((current) => ({ ...current, equipment }))}
+                placeholder="Equipment"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={planForm.equipment}
+              />
+              <TextInput
+                accessibilityLabel="Workout restriction labels"
+                onChangeText={(userRestrictions) => setPlanForm((current) => ({ ...current, userRestrictions }))}
+                placeholder="Restriction labels, comma separated"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={planForm.userRestrictions}
+              />
+              <TextInput
+                accessibilityLabel="Workout notes"
+                multiline
+                onChangeText={(notes) => setPlanForm((current) => ({ ...current, notes }))}
+                placeholder="Notes"
+                placeholderTextColor={COLORS.textMuted}
+                style={[styles.input, styles.textArea]}
+                value={planForm.notes}
+              />
+            </ScrollView>
+            <TouchableOpacity
+              accessibilityLabel="Save workout plan"
+              accessibilityRole="button"
+              activeOpacity={0.82}
+              onPress={handleSavePlan}
+              style={styles.primaryModalButton}
+            >
+              <Text style={styles.primaryModalButtonText}>{editingPlan ? "Update Workout" : "Add Workout"}</Text>
+            </TouchableOpacity>
+          </CustomCard>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -781,6 +1568,26 @@ const styles = StyleSheet.create({
   emptyCard: {
     padding: 0,
   },
+  actionNoticeCard: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  actionNoticeIcon: {
+    alignItems: "center",
+    backgroundColor: FITNESS_COLORS.light,
+    borderRadius: SPACING.lg,
+    height: SPACING.xxxl,
+    justifyContent: "center",
+    width: SPACING.xxxl,
+  },
+  actionNoticeText: {
+    color: COLORS.textMuted,
+    flex: 1,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: TYPOGRAPHY.lineHeights.sm,
+  },
   filterCard: {
     alignItems: "center",
     flexDirection: "row",
@@ -923,6 +1730,202 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.md,
+  },
+  preferencesCard: {
+    gap: SPACING.md,
+  },
+  safetyText: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: TYPOGRAPHY.lineHeights.sm,
+  },
+  input: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderColor: COLORS.border,
+    borderRadius: SPACING.lg,
+    borderWidth: 1,
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    minHeight: 48,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  textArea: {
+    minHeight: 92,
+    textAlignVertical: "top",
+  },
+  switchRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.md,
+    justifyContent: "space-between",
+  },
+  switchCopy: {
+    flex: 1,
+  },
+  switchTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  modalBackdrop: {
+    alignItems: "center",
+    backgroundColor: "rgba(12, 20, 33, 0.44)",
+    flex: 1,
+    justifyContent: "center",
+    padding: SPACING.lg,
+  },
+  modalCard: {
+    maxHeight: "88%",
+    maxWidth: SPACING.maxContentWidth,
+    padding: SPACING.lg,
+    width: "100%",
+  },
+  modalHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: SPACING.md,
+    justifyContent: "space-between",
+    marginBottom: SPACING.md,
+  },
+  modalTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.xl,
+    fontWeight: TYPOGRAPHY.weights.heavy,
+    lineHeight: TYPOGRAPHY.lineHeights.xl,
+  },
+  closeButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: SPACING.lg,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  modalScroll: {
+    marginTop: SPACING.md,
+  },
+  pickerRow: {
+    alignItems: "center",
+    borderBottomColor: COLORS.border,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+  },
+  pickerIcon: {
+    alignItems: "center",
+    backgroundColor: FITNESS_COLORS.light,
+    borderRadius: SPACING.lg,
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+  pickerCopy: {
+    flex: 1,
+  },
+  pickerTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  restrictionText: {
+    color: COLORS.warning,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    marginTop: SPACING.xs,
+  },
+  timerValue: {
+    color: FITNESS_COLORS.dark,
+    fontSize: 54,
+    fontWeight: TYPOGRAPHY.weights.heavy,
+    marginTop: SPACING.md,
+    textAlign: "center",
+  },
+  timerTarget: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    marginBottom: SPACING.md,
+    textAlign: "center",
+  },
+  timerControls: {
+    flexDirection: "row",
+    gap: SPACING.md,
+    marginTop: SPACING.lg,
+  },
+  primaryModalButton: {
+    alignItems: "center",
+    backgroundColor: FITNESS_COLORS.primary,
+    borderRadius: SPACING.lg,
+    flexDirection: "row",
+    flex: 1,
+    gap: SPACING.sm,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: SPACING.md,
+  },
+  completeModalButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.accent,
+    borderRadius: SPACING.lg,
+    flexDirection: "row",
+    gap: SPACING.sm,
+    justifyContent: "center",
+    marginTop: SPACING.md,
+    minHeight: 48,
+    paddingHorizontal: SPACING.md,
+  },
+  primaryModalButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  secondaryModalButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: SPACING.lg,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: SPACING.lg,
+  },
+  secondaryModalButtonText: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  formLabel: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    marginTop: SPACING.md,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  choiceChip: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderColor: COLORS.border,
+    borderRadius: SPACING.lg,
+    borderWidth: 1,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  choiceChipSelected: {
+    backgroundColor: FITNESS_COLORS.primary,
+    borderColor: FITNESS_COLORS.primary,
+  },
+  choiceChipText: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  choiceChipTextSelected: {
+    color: COLORS.white,
   },
   statsRow: {
     flexDirection: "row",

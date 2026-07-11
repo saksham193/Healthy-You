@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
+import { queueHydrationSync, queueNutritionMealSync } from "../services/sync/syncPayloads";
 import type { HydrationLogEntry, NutritionLogEntry, NutritionMealType } from "../types";
 
 type NutritionMealInput = {
@@ -133,6 +134,7 @@ export const useNutritionStore = create<NutritionStoreState>((set, get) => ({
 
     set({ meals: next.meals, error: null });
     await savePersistedState(next);
+    await queueNutritionMealSync(nextMeal, "create");
     return nextMeal;
   },
   updateMeal: async (id, meal) => {
@@ -147,9 +149,11 @@ export const useNutritionStore = create<NutritionStoreState>((set, get) => ({
 
     set({ meals: next.meals, error: null });
     await savePersistedState(next);
+    await queueNutritionMealSync(nextMeal, "update");
     return nextMeal;
   },
   deleteMeal: async (id) => {
+    const current = get().meals.find((meal) => meal.id === id);
     const next = {
       meals: get().meals.filter((meal) => meal.id !== id),
       hydration: get().hydration,
@@ -157,6 +161,7 @@ export const useNutritionStore = create<NutritionStoreState>((set, get) => ({
 
     set({ meals: next.meals, error: null });
     await savePersistedState(next);
+    if (current) await queueNutritionMealSync(current, "delete");
   },
   addWater: async (amountMl = DEFAULT_WATER_INCREMENT_ML) => {
     const loggedAt = new Date().toISOString();
@@ -173,10 +178,12 @@ export const useNutritionStore = create<NutritionStoreState>((set, get) => ({
 
     set({ hydration: next.hydration, error: null });
     await savePersistedState(next);
+    await queueHydrationSync(nextEntry, "create");
     return nextEntry;
   },
   resetTodayHydration: async () => {
     const today = getLocalDateKey();
+    const removed = get().hydration.filter((entry) => entry.dateKey === today);
     const next = {
       meals: get().meals,
       hydration: get().hydration.filter((entry) => entry.dateKey !== today),
@@ -184,6 +191,7 @@ export const useNutritionStore = create<NutritionStoreState>((set, get) => ({
 
     set({ hydration: next.hydration, error: null });
     await savePersistedState(next);
+    await Promise.all(removed.map((entry) => queueHydrationSync(entry, "delete")));
   },
   clearAll: async () => {
     const next = { meals: [], hydration: [] };

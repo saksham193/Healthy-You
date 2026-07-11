@@ -25,4 +25,12 @@ export class SyncController {
 
     response.json({ data: this.sync.pull(getUserId(request), updatedAfter) });
   };
+
+  exportData = (request: Request, response: Response): void => {
+    response.json({ data: this.sync.exportData(getUserId(request)) });
+  };
+
+  deleteData = (request: Request, response: Response): void => {
+    response.json({ data: this.sync.deleteData(getUserId(request)) });
+  };
 }

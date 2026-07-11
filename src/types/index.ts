@@ -133,6 +133,16 @@ export type WorkoutPlan = {
   status: "completed" | "active" | "pending";
   iconName: IconName;
   tone: Tone;
+  category?: "strength" | "cardio" | "mobility" | "recovery" | "custom";
+  durationMinutes?: number;
+  intensity?: "low" | "moderate" | "high";
+  bodyFocus?: string[];
+  equipment?: string;
+  notes?: string;
+  userRestrictions?: string[];
+  isCustom?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type FitnessWorkoutCompletionEntry = {
@@ -146,7 +156,17 @@ export type FitnessWorkoutCompletionEntry = {
   difficulty: string;
   completedAt: string;
   dateKey: string;
+  intensity?: "low" | "moderate" | "high";
   notes?: string;
+};
+
+export type FitnessPreferences = {
+  bodyType?: string;
+  goals: string[];
+  limitations: string[];
+  restrictionNotes?: string;
+  hideRestrictedWorkouts: boolean;
+  updatedAt: string;
 };
 
 export type ExerciseCategory = {

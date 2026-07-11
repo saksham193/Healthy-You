@@ -21,6 +21,21 @@ import { useDevices } from "../../hooks/useDevices";
 import { useHealthData } from "../../hooks/useHealthData";
 import { updateCurrentUser } from "../../services/api/UserApi";
 import { requestNotificationPermission } from "../../services/notifications/notificationService";
+import { deleteCloudSyncData, exportCloudSyncData } from "../../services/sync/syncApi";
+import {
+  CLOUD_SYNC_AUTO_UPLOAD_ENABLED,
+  CLOUD_SYNC_BACKGROUND_SYNC_ENABLED,
+  isManualCloudSyncEnabled,
+} from "../../services/sync/syncFeatureFlags";
+import {
+  clearSyncQueue,
+  getSyncConflictReviewItems,
+  getSyncQueueMetadataExport,
+  getSyncQueueSummary,
+  markSyncConflictForRetry,
+  removeSyncQueueItem,
+} from "../../services/sync/syncQueue";
+import { flushSyncQueue } from "../../services/sync/syncService";
 import {
   cancelAllHealthReminders,
   getStoredNotificationStatus,
@@ -39,6 +54,7 @@ import type {
   HealthReminderRecord,
   NotificationPermissionStatus,
 } from "../../services/notifications/reminderTypes";
+import type { SyncConflictReviewItem, SyncEntityType } from "../../services/sync/syncTypes";
 
 type ProfileDraft = {
   name: string;
@@ -100,6 +116,28 @@ const notificationUnavailableMessage = (status: NotificationPermissionStatus): s
   return "Healthy You could not enable notifications. Local tracking still works without reminders.";
 };
 
+const syncEntityLabels: Record<SyncEntityType, string> = {
+  nutrition_log: "Nutrition log",
+  hydration_log: "Hydration log",
+  fitness_log: "Fitness log",
+  habit_completion: "Habit completion",
+  medication_log: "Medication log",
+  schedule_routine: "Custom routine",
+  profile_settings: "Profile settings",
+};
+
+const formatSyncDate = (value: string | undefined): string => {
+  if (!value) return "Not recorded";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+
+  return date.toLocaleString();
+};
+
+const getConflictTitle = (item: SyncConflictReviewItem): string =>
+  `${syncEntityLabels[item.entityType]} ${item.operation}`;
+
 const applyLocalProfileEdits = (
   profile: ProfileData,
   localProfile: LocalProfileDisplay | null,
@@ -158,6 +196,7 @@ export default function ProfileScreen() {
   const clearFitness = useFitnessStore((state) => state.clearAll);
   const habitCompletions = useScheduleStore((state) => state.habitCompletions);
   const medicationLogs = useScheduleStore((state) => state.medicationLogs);
+  const customRoutines = useScheduleStore((state) => state.customRoutines);
   const hydrateSchedule = useScheduleStore((state) => state.hydrate);
   const clearSchedule = useScheduleStore((state) => state.clearAll);
   const disableAllCustomRoutineReminders = useScheduleStore((state) => state.disableAllCustomRoutineReminders);
@@ -165,15 +204,31 @@ export default function ProfileScreen() {
   const [draft, setDraft] = useState<ProfileDraft>(emptyDraft);
   const [savingProfile, setSavingProfile] = useState(false);
   const [exportVisible, setExportVisible] = useState(false);
+  const [exportTitle, setExportTitle] = useState("Local Data Export");
+  const [exportSubtitle, setExportSubtitle] = useState("Preview JSON for this device");
   const [exportPreview, setExportPreview] = useState("");
   const [resettingLocalData, setResettingLocalData] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionStatus>("undetermined");
   const [scheduledReminders, setScheduledReminders] = useState<HealthReminderRecord[]>([]);
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [clearingReminders, setClearingReminders] = useState(false);
+  const [manualSyncing, setManualSyncing] = useState(false);
+  const [clearingSyncQueue, setClearingSyncQueue] = useState(false);
+  const [cloudExporting, setCloudExporting] = useState(false);
+  const [cloudDeleting, setCloudDeleting] = useState(false);
+  const [manualSyncMessage, setManualSyncMessage] = useState("Manual sync status will appear here.");
+  const [manualSyncPendingCount, setManualSyncPendingCount] = useState(0);
+  const [manualSyncConflictCount, setManualSyncConflictCount] = useState(0);
+  const [conflictReviewVisible, setConflictReviewVisible] = useState(false);
+  const [syncConflictItems, setSyncConflictItems] = useState<SyncConflictReviewItem[]>([]);
+  const [selectedConflictId, setSelectedConflictId] = useState<string | null>(null);
   const effectiveProfile = useMemo(
     () => (profile ? applyLocalProfileEdits(profile, localProfile) : null),
     [localProfile, profile],
+  );
+  const selectedConflictItem = useMemo(
+    () => syncConflictItems.find((item) => item.id === selectedConflictId) ?? syncConflictItems[0],
+    [selectedConflictId, syncConflictItems],
   );
   const localWellnessEntryCount =
     nutritionMeals.length +
@@ -181,6 +236,14 @@ export default function ProfileScreen() {
     workoutCompletions.length +
     habitCompletions.length +
     medicationLogs.length;
+  const supportedManualSyncEntityCount =
+    nutritionMeals.length +
+    hydrationLogs.length +
+    workoutCompletions.length +
+    habitCompletions.length +
+    medicationLogs.length +
+    customRoutines.length +
+    (localProfile ? 1 : 0);
 
   useEffect(() => {
     void hydrateLocalProfile();
@@ -188,6 +251,46 @@ export default function ProfileScreen() {
     void hydrateFitness();
     void hydrateSchedule();
   }, [hydrateFitness, hydrateLocalProfile, hydrateNutrition, hydrateSchedule]);
+
+  const refreshManualSyncStatus = async () => {
+    const [summary, conflictItems] = await Promise.all([
+      getSyncQueueSummary(),
+      getSyncConflictReviewItems(),
+    ]);
+
+    setManualSyncPendingCount(summary.pendingCount);
+    setManualSyncConflictCount(summary.conflictCount);
+    setSyncConflictItems(conflictItems);
+
+    if (!isManualCloudSyncEnabled()) {
+      setManualSyncMessage("Sync is disabled in this build.");
+      return;
+    }
+
+    if (summary.conflictCount > 0) {
+      setManualSyncMessage("Some changes need review before they can sync. Your local data was not overwritten.");
+      return;
+    }
+
+    if (summary.pendingCount > 0) {
+      setManualSyncMessage(`${summary.pendingCount} change${summary.pendingCount === 1 ? "" : "s"} waiting to sync.`);
+      return;
+    }
+
+    setManualSyncMessage("No changes waiting to sync.");
+  };
+
+  useEffect(() => {
+    void refreshManualSyncStatus();
+  }, [
+    customRoutines.length,
+    habitCompletions.length,
+    hydrationLogs.length,
+    localProfile?.updatedAt,
+    medicationLogs.length,
+    nutritionMeals.length,
+    workoutCompletions.length,
+  ]);
 
   const refreshNotificationState = async () => {
     const [status, reminders] = await Promise.all([
@@ -335,9 +438,11 @@ export default function ProfileScreen() {
     const nutritionState = useNutritionStore.getState();
     const fitnessState = useFitnessStore.getState();
     const scheduleState = useScheduleStore.getState();
+    const syncQueueMetadata = await getSyncQueueMetadataExport();
     const exported = {
       exportedAt: new Date().toISOString(),
-      betaNotice: "This is a local device export preview. It is not a cloud export or account deletion receipt.",
+      betaNotice:
+        "This is a local device export preview. It is not a cloud export, account deletion receipt, or external sign-in account export.",
       profile: {
         displayName: profileSnapshot?.name ?? accountDisplayName,
         email: authUser?.email ?? null,
@@ -363,13 +468,17 @@ export default function ProfileScreen() {
       medication: {
         logs: scheduleState.medicationLogs,
       },
+      localSyncQueue: syncQueueMetadata,
       privacyNotes: [
-        "Phase 4C nutrition, hydration, workout, habit, and medication logs are local to this device.",
-        "Clearing local wellness data removes these local logs without logging out.",
-        "Account deletion is deferred in this beta build because no backend deletion endpoint is available.",
+        "This export is generated locally on this device and is shown only as an in-app preview.",
+        "Files, images, audio, attachments, AI prompts/responses, auth tokens, and queue payload values are not included.",
+        "Clearing local wellness data removes local logs from this device without logging out.",
+        "Deleting cloud sync data is a separate signed-in action and does not delete your external sign-in provider account.",
       ],
     };
 
+    setExportTitle("Local Data Export");
+    setExportSubtitle("Supported local device data preview");
     setExportPreview(JSON.stringify(exported, null, 2));
     setExportVisible(true);
   };
@@ -395,7 +504,7 @@ export default function ProfileScreen() {
   const confirmClearLocalWellnessData = () => {
     Alert.alert(
       "Clear local wellness data?",
-      "This removes local nutrition, hydration, workout, habit, and medication logs from this device. It does not delete your account or sign you out.",
+      "This removes local nutrition, hydration, workout, habit, and medication logs from this device. It does not clear cloud sync records, delete your account, or sign you out. This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -406,6 +515,218 @@ export default function ProfileScreen() {
       ],
     );
   };
+  const clearLocalSyncQueue = async () => {
+    setClearingSyncQueue(true);
+    try {
+      await clearSyncQueue();
+      await refreshManualSyncStatus();
+      Alert.alert(
+        "Local sync queue cleared",
+        "Pending and conflict sync queue metadata was removed from this device. Local health records were not deleted.",
+      );
+    } catch (queueError) {
+      Alert.alert(
+        "Unable to clear sync queue",
+        queueError instanceof Error ? queueError.message : "The local sync queue could not be cleared right now.",
+      );
+    } finally {
+      setClearingSyncQueue(false);
+    }
+  };
+
+  const confirmClearLocalSyncQueue = () => {
+    if (manualSyncPendingCount + manualSyncConflictCount === 0) {
+      Alert.alert("No queued sync data", "There are no local sync queue items to clear on this device.");
+      return;
+    }
+
+    Alert.alert(
+      "Clear local sync queue?",
+      "This removes pending and conflict sync queue metadata from this device. It does not delete local health records or cloud sync records. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: clearingSyncQueue ? "Clearing..." : "Clear Queue",
+          style: "destructive",
+          onPress: () => void clearLocalSyncQueue(),
+        },
+      ],
+    );
+  };
+
+  const handleCloudSyncExport = async () => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        "Sign in required",
+        "Sign in before exporting Healthy You cloud sync records. Your local device data stays on this device.",
+      );
+      return;
+    }
+
+    setCloudExporting(true);
+    try {
+      const exported = await exportCloudSyncData();
+      setExportTitle("Cloud Sync Export");
+      setExportSubtitle("Backend sync record metadata only");
+      setExportPreview(JSON.stringify(exported, null, 2));
+      setExportVisible(true);
+    } catch {
+      Alert.alert(
+        "Cloud export unavailable",
+        "Healthy You could not export backend sync records right now. Local data remains on this device.",
+      );
+    } finally {
+      setCloudExporting(false);
+    }
+  };
+
+  const deleteCloudSyncRecords = async () => {
+    setCloudDeleting(true);
+    try {
+      const result = await deleteCloudSyncData();
+      Alert.alert(
+        "Cloud sync data deleted",
+        `${result.deletedCount} Healthy You cloud sync record${result.deletedCount === 1 ? "" : "s"} deleted from the backend. Local device data and your external sign-in account were not deleted.`,
+      );
+    } catch {
+      Alert.alert(
+        "Cloud deletion unavailable",
+        "Healthy You could not delete backend sync records right now. Local data and the local sync queue are unchanged.",
+      );
+    } finally {
+      setCloudDeleting(false);
+    }
+  };
+
+  const confirmDeleteCloudSyncData = () => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        "Sign in required",
+        "Sign in before deleting Healthy You cloud sync records. This does not affect local data on this device.",
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Delete cloud sync data?",
+      "This deletes Healthy You cloud sync records stored for your signed-in account by this backend. It does not delete local device data or your external sign-in provider account. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: cloudDeleting ? "Deleting..." : "Delete Cloud Sync Data",
+          style: "destructive",
+          onPress: () => void deleteCloudSyncRecords(),
+        },
+      ],
+    );
+  };
+
+  const handleManualSyncNow = async () => {
+    if (!isManualCloudSyncEnabled()) {
+      setManualSyncMessage("Sync is disabled in this build.");
+      return;
+    }
+
+    if (!isAuthenticated) {
+      setManualSyncMessage("Sign in is required before cloud sync.");
+      Alert.alert("Sign in required", "Sign in before using manual cloud sync. Your local data stays on this device.");
+      return;
+    }
+
+    setManualSyncing(true);
+    setManualSyncMessage("Syncing...");
+
+    try {
+      const result = await flushSyncQueue();
+      await refreshManualSyncStatus();
+
+      if (result.status === "idle") {
+        setManualSyncMessage("Sync complete.");
+        Alert.alert(
+          "Sync complete",
+          result.uploadedCount > 0
+            ? `${result.uploadedCount} change${result.uploadedCount === 1 ? "" : "s"} synced.`
+            : "There are no pending manual sync changes.",
+        );
+        return;
+      }
+
+      if (result.status === "not_enabled") {
+        setManualSyncMessage("Sync is disabled in this build.");
+        Alert.alert("Sync disabled", "Manual cloud sync is disabled in this build.");
+        return;
+      }
+
+      if (result.status === "auth_required") {
+        setManualSyncMessage("Sign in is required before cloud sync.");
+        Alert.alert("Sign in required", "Sign in again before manual sync. Your data is still saved locally.");
+        return;
+      }
+
+      if (result.status === "conflict") {
+        setManualSyncMessage("Some changes need review before they can sync. Your local data was not overwritten.");
+        Alert.alert(
+          "Sync needs review",
+          "Some changes need review before they can sync. Your local data was not overwritten.",
+        );
+        return;
+      }
+
+      if (result.status === "failed") {
+        setManualSyncMessage("Sync failed. Your data is still saved locally.");
+        Alert.alert("Sync failed", "Your data is still saved locally. Try again when connection returns.");
+        return;
+      }
+
+      if (result.status === "pending") {
+        setManualSyncMessage(`${result.remainingCount} change${result.remainingCount === 1 ? "" : "s"} waiting to sync.`);
+        Alert.alert("Sync incomplete", "Some changes are still waiting to sync. Your local data is unchanged.");
+      }
+    } finally {
+      setManualSyncing(false);
+      void refreshManualSyncStatus();
+    }
+  };
+  const openConflictReview = async () => {
+    await refreshManualSyncStatus();
+    setSelectedConflictId(null);
+    setConflictReviewVisible(true);
+  };
+
+  const handleRetryConflictLater = () => {
+    setConflictReviewVisible(false);
+    setManualSyncMessage("Conflict review postponed. Your local data was not overwritten.");
+  };
+
+  const handleKeepLocalAndRetry = async (itemId: string) => {
+    await markSyncConflictForRetry(itemId);
+    await refreshManualSyncStatus();
+    setSelectedConflictId(null);
+    setManualSyncMessage("Local change kept in the queue. Tap Sync now when you want to retry.");
+    Alert.alert("Kept local change", "The local record remains saved and can retry on your next manual sync.");
+  };
+
+  const confirmRemoveConflictFromQueue = (item: SyncConflictReviewItem) => {
+    Alert.alert(
+      "Remove from sync queue?",
+      "This removes only the queued sync copy. It does not delete the local health record from this device.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove Queue Item",
+          style: "destructive",
+          onPress: () => {
+            void removeSyncQueueItem(item.id).then(async () => {
+              await refreshManualSyncStatus();
+              setSelectedConflictId(null);
+              setManualSyncMessage("Conflict removed from the sync queue. Local data is unchanged.");
+            });
+          },
+        },
+      ],
+    );
+  };
+
   const handleEnableNotifications = () => {
     setNotificationBusy(true);
     void requestNotificationPermission()
@@ -460,14 +781,14 @@ export default function ProfileScreen() {
   const showPrivacyNotice = () => {
     Alert.alert(
       "Privacy & Data",
-      "Phase 4C wellness logs are stored locally on this device unless a sync status explicitly says otherwise. You can preview the local export or clear local wellness data from this screen.",
+      "Wellness logs are stored locally on this device unless a sync status explicitly says otherwise. Local export, local data clearing, local queue clearing, and cloud sync record deletion are separate actions.",
     );
   };
 
   const showAccountDeletionNotice = () => {
     Alert.alert(
       "Account deletion in beta",
-      "This beta build does not expose a validated backend account deletion endpoint yet. You can clear local wellness data from this device now; full account deletion remains a release follow-up.",
+      "This beta build can delete Healthy You backend sync records only. It does not delete your external sign-in provider account. Local wellness data can be cleared separately from this device.",
     );
   };
 
@@ -686,17 +1007,108 @@ export default function ProfileScreen() {
 
         <DashboardSection title="Privacy & Data" />
         <CustomCard style={styles.settingsCard}>
+          <View style={styles.cloudSyncPanel}>
+            <View style={styles.permissionHeader}>
+              <View style={styles.permissionIcon}>
+                <Ionicons color={COLORS.brandDeepBlue} name="cloud-upload-outline" size={20} />
+              </View>
+              <View style={styles.permissionCopy}>
+                <Text style={styles.permissionTitle}>Cloud Sync</Text>
+                <Text style={styles.permissionStatus}>
+                  {manualSyncMessage}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.permissionText}>
+              Manual sync keeps supported health logs backed up when you choose to sync. Automatic and background sync are off in this build.
+            </Text>
+            <View style={styles.syncStatusList}>
+              <View style={styles.syncStatusPill}>
+                <Text numberOfLines={2} style={styles.syncStatus}>
+                  {manualSyncPendingCount} queued
+                </Text>
+              </View>
+              <View style={styles.syncStatusPill}>
+                <Text numberOfLines={2} style={styles.syncStatus}>
+                  {manualSyncConflictCount} conflicts
+                </Text>
+              </View>
+              <View style={styles.syncStatusPill}>
+                <Text numberOfLines={2} style={styles.syncStatus}>
+                  {supportedManualSyncEntityCount} supported local records
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.permissionText}>
+              Manual sync covers nutrition, hydration, workout, habit, medication, custom routine, and local profile display records. Files, images, audio, attachments, AI content, and notification text are not synced.
+            </Text>
+            <Text style={styles.accountMeta}>
+              Auto upload: {CLOUD_SYNC_AUTO_UPLOAD_ENABLED ? "on" : "off"} | Background sync: {CLOUD_SYNC_BACKGROUND_SYNC_ENABLED ? "on" : "off"}
+            </Text>
+            <Pressable
+              accessibilityLabel="Review sync conflicts"
+              accessibilityRole="button"
+              disabled={manualSyncConflictCount === 0}
+              onPress={() => void openConflictReview()}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                (pressed || manualSyncConflictCount === 0) && styles.secondaryButtonPressed,
+              ]}
+            >
+              <Ionicons color={COLORS.brandDeepBlue} name="alert-circle-outline" size={18} />
+              <Text style={styles.secondaryButtonText}>
+                {manualSyncConflictCount > 0 ? "Review conflicts" : "No conflicts need review"}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Sync now"
+              accessibilityRole="button"
+              disabled={manualSyncing || !isManualCloudSyncEnabled()}
+              onPress={() => void handleManualSyncNow()}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                (pressed || manualSyncing || !isManualCloudSyncEnabled()) && styles.secondaryButtonPressed,
+              ]}
+            >
+              <Ionicons color={COLORS.brandDeepBlue} name="sync-outline" size={18} />
+              <Text style={styles.secondaryButtonText}>{manualSyncing ? "Syncing..." : "Sync now"}</Text>
+            </Pressable>
+            <View style={styles.permissionDivider} />
+          </View>
           <SettingRow
             iconName="shield-checkmark-outline"
             onPress={showPrivacyNotice}
-            subtitle="Local-only Phase 4C logs are identified clearly. No cloud sync is claimed for them."
+            subtitle="Local device data, sync queue metadata, backend sync records, and external account deletion are separate."
             title="Privacy Notes"
           />
           <SettingRow
             iconName="document-text-outline"
             onPress={() => void buildLocalExportPreview()}
-            subtitle="Preview profile display data plus nutrition, fitness, habit, and medication logs as JSON."
+            subtitle="Preview supported Healthy You data stored on this device. Files, media, AI content, tokens, and queue payload values are excluded."
             title="Export Local Data"
+          />
+          <SettingRow
+            destructive
+            disabled={clearingSyncQueue}
+            iconName="cloud-offline-outline"
+            onPress={confirmClearLocalSyncQueue}
+            subtitle={`${manualSyncPendingCount + manualSyncConflictCount} queue item${manualSyncPendingCount + manualSyncConflictCount === 1 ? "" : "s"} on this device. Local health records are unchanged.`}
+            title={clearingSyncQueue ? "Clearing Sync Queue" : "Clear Local Sync Queue"}
+          />
+          <SettingRow
+            disabled={cloudExporting}
+            iconName="cloud-download-outline"
+            onPress={() => void handleCloudSyncExport()}
+            subtitle="Exports backend sync record metadata for your signed-in account only. Payload values, files, media, AI content, and tokens are excluded."
+            title={cloudExporting ? "Exporting Cloud Sync" : "Export Cloud Sync Data"}
+          />
+          <SettingRow
+            destructive
+            disabled={cloudDeleting}
+            iconName="cloud-offline-outline"
+            onPress={confirmDeleteCloudSyncData}
+            subtitle="Deletes Healthy You backend sync records only. It does not delete local data or your external sign-in account."
+            title={cloudDeleting ? "Deleting Cloud Sync Data" : "Delete Cloud Sync Data"}
           />
           <SettingRow
             destructive
@@ -892,13 +1304,121 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      <Modal
+        animationType="slide"
+        transparent
+        visible={conflictReviewVisible}
+        onRequestClose={() => setConflictReviewVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.exportModalCard]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Sync Conflicts</Text>
+                <Text style={styles.modalSubtitle}>
+                  {syncConflictItems.length > 0
+                    ? "Review queue metadata before retrying. Local data was not overwritten."
+                    : "No conflicts need review."}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Close conflict review"
+                accessibilityRole="button"
+                onPress={() => setConflictReviewVisible(false)}
+                style={styles.iconButton}
+              >
+                <Ionicons color={COLORS.textMuted} name="close-outline" size={24} />
+              </Pressable>
+            </View>
+
+            {syncConflictItems.length > 0 && selectedConflictItem ? (
+              <>
+                <ScrollView style={styles.conflictList}>
+                  {syncConflictItems.map((item) => {
+                    const selected = item.id === selectedConflictItem.id;
+
+                    return (
+                      <Pressable
+                        accessibilityLabel={`Review ${getConflictTitle(item)}`}
+                        accessibilityRole="button"
+                        key={item.id}
+                        onPress={() => setSelectedConflictId(item.id)}
+                        style={({ pressed }) => [
+                          styles.conflictItem,
+                          selected && styles.conflictItemSelected,
+                          pressed && styles.secondaryButtonPressed,
+                        ]}
+                      >
+                        <Text style={styles.settingTitle}>{getConflictTitle(item)}</Text>
+                        <Text style={styles.settingSubtitle}>
+                          Local update: {formatSyncDate(item.localUpdatedAt)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                <View style={styles.conflictDetailBox}>
+                  <Text style={styles.betaTitle}>{getConflictTitle(selectedConflictItem)}</Text>
+                  <Text style={styles.conflictMeta}>Entity type: {syncEntityLabels[selectedConflictItem.entityType]}</Text>
+                  <Text style={styles.conflictMeta}>Queue status: conflict</Text>
+                  <Text style={styles.conflictMeta}>Local updated: {formatSyncDate(selectedConflictItem.localUpdatedAt)}</Text>
+                  <Text style={styles.conflictMeta}>Last attempt: {formatSyncDate(selectedConflictItem.lastAttemptAt)}</Text>
+                  <Text style={styles.conflictMeta}>Queued: {formatSyncDate(selectedConflictItem.queuedAt)}</Text>
+                  <Text style={styles.conflictMeta}>Reason: {selectedConflictItem.reason}</Text>
+                  <Text style={styles.conflictMeta}>Server updated: {formatSyncDate(selectedConflictItem.serverUpdatedAt)}</Text>
+                  <Text style={styles.modalNote}>
+                    Payload values are hidden here. No server version is applied automatically.
+                  </Text>
+                </View>
+
+                <View style={styles.conflictActions}>
+                  <Pressable
+                    accessibilityLabel="Retry conflict later"
+                    accessibilityRole="button"
+                    onPress={handleRetryConflictLater}
+                    style={({ pressed }) => [styles.cancelButton, pressed && styles.secondaryButtonPressed]}
+                  >
+                    <Text style={styles.cancelButtonText}>Retry later</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="Keep local and retry"
+                    accessibilityRole="button"
+                    onPress={() => void handleKeepLocalAndRetry(selectedConflictItem.id)}
+                    style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}
+                  >
+                    <Ionicons color={COLORS.brandDeepBlue} name="refresh-outline" size={18} />
+                    <Text style={styles.secondaryButtonText}>Keep local and retry</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="Remove conflict from sync queue"
+                    accessibilityRole="button"
+                    onPress={() => confirmRemoveConflictFromQueue(selectedConflictItem)}
+                    style={({ pressed }) => [styles.deleteQueueButton, pressed && styles.secondaryButtonPressed]}
+                  >
+                    <Text style={styles.deleteQueueButtonText}>Remove from queue</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <View style={styles.conflictDetailBox}>
+                <Text style={styles.betaTitle}>No conflicts need review.</Text>
+                <Text style={styles.permissionText}>
+                  Manual sync will still require an explicit tap. Local records remain on this device.
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <Modal animationType="slide" transparent visible={exportVisible} onRequestClose={() => setExportVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalCard, styles.exportModalCard]}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Local Data Export</Text>
-                <Text style={styles.modalSubtitle}>Preview JSON for this device</Text>
+                <Text style={styles.modalTitle}>{exportTitle}</Text>
+                <Text style={styles.modalSubtitle}>{exportSubtitle}</Text>
               </View>
               <Pressable
                 accessibilityLabel="Close export preview"
@@ -1155,6 +1675,10 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     padding: SPACING.md,
   },
+  cloudSyncPanel: {
+    gap: SPACING.md,
+    padding: SPACING.sm,
+  },
   settingRow: {
     alignItems: "center",
     borderRadius: 16,
@@ -1248,6 +1772,57 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: COLORS.brandDeepBlue,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  conflictList: {
+    maxHeight: 180,
+    marginBottom: SPACING.md,
+  },
+  conflictItem: {
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+    padding: SPACING.md,
+  },
+  conflictItemSelected: {
+    backgroundColor: COLORS.brandSoftBlue,
+    borderColor: COLORS.brandDeepBlue,
+  },
+  conflictDetailBox: {
+    backgroundColor: COLORS.background,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+    padding: SPACING.md,
+  },
+  conflictMeta: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 16,
+  },
+  conflictActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    justifyContent: "flex-end",
+  },
+  deleteQueueButton: {
+    alignItems: "center",
+    borderColor: COLORS.danger,
+    borderRadius: 16,
+    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.md,
+  },
+  deleteQueueButtonText: {
+    color: COLORS.danger,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.bold,
   },

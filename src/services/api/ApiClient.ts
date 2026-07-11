@@ -91,8 +91,8 @@ export class ApiClient {
     }, options);
   }
 
-  async delete(path: string, options: RequestOptions = {}): Promise<void> {
-    await this.request<void>(path, { method: "DELETE" }, options);
+  async delete<T = void>(path: string, options: RequestOptions = {}): Promise<T> {
+    return this.request<T>(path, { method: "DELETE" }, options);
   }
 
   private async request<T>(

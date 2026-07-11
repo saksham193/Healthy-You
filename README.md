@@ -8,7 +8,7 @@ This checkpoint contains the completed Phase 3 AI Platform through `v0.13.0-alph
 
 - Health dashboard with nutrition, fitness, sleep, schedule, profile, and device data.
 - Android Health Connect integration for local health summaries.
-- Cloud sync backend persistence foundation with frontend sync disabled by default until explicit future consent and mobile enablement are ready.
+- Cloud sync backend persistence foundation with explicit manual mobile sync only; automatic and background sync remain disabled.
 - Secure authentication with token storage via SecureStore.
 - Medibot AI assistant with direct metric answers and safe wellness guidance.
 - Offline AI mode with local rules, cache, and safety handling.
@@ -123,7 +123,12 @@ node scripts/validate-ai-quality.js
 - Phase 5E calendar/device integrations after reminder and media permission flows are stable.
 - Phase 6A added cloud sync architecture, data contracts, backend readiness, and disabled-by-default sync foundations.
 - Phase 6B added authenticated backend persistence for generic sync entities while mobile automatic sync remains disabled.
-- Full mobile cloud sync enablement, account deletion, data export, and consent UX remain future Phase 6 work.
+- Phase 6C adds offline-first mobile queueing and explicit Profile/Data Controls manual sync; Android runtime QA passed and automatic/background sync remain disabled.
+- Phase 6D adds conflict review UI plus broader safe entity queue wiring for manual sync; Android runtime QA passed.
+- Phase 6E adds export/deletion boundary hardening, local sync queue clearing, and backend cloud sync metadata export/delete controls; Android runtime QA passed.
+- Phase 6F closed consolidated Android QA and release closure after the RC2 fitness/See All fix pass resolved the P1 blocker.
+- Phase 7A prepares production backend and monitoring readiness planning; no Phase 7 runtime code has been implemented yet.
+- Phase 7B will focus on production database and migration hardening.
 
 ## Tech Stack
 
@@ -141,7 +146,7 @@ node scripts/validate-ai-quality.js
 - Local env files are ignored.
 - Tokens are stored through SecureStore.
 - AsyncStorage queues must not contain credentials.
-- Cloud sync is disabled by default on mobile; local health data is not automatically uploaded.
+- Cloud sync upload is manual-only on mobile; local health data is not automatically uploaded.
 - Generated builds, caches, node modules, backend data, and SQLite files are ignored.
 - AI safety guard blocks diagnosis, medication dosage, emergency, and self-harm requests.
 

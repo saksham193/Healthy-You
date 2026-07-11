@@ -1,5 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
+import {
+  queueHabitCompletionSync,
+  queueMedicationLogSync,
+  queueScheduleRoutineSync,
+} from "../services/sync/syncPayloads";
 import type {
   CustomHealthRoutine,
   CustomHealthRoutineType,
@@ -233,9 +238,13 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
 
     set({ habitCompletions: next.habitCompletions, error: null });
     await savePersistedState(next);
+    await queueHabitCompletionSync(nextCompletion, existing ? "update" : "create");
     return nextCompletion;
   },
   uncompleteHabit: async (habitId, dateKey = getLocalDateKey()) => {
+    const current = get().habitCompletions.find(
+      (completion) => completion.habitId === habitId && completion.dateKey === dateKey,
+    );
     const next = {
       habitCompletions: get().habitCompletions.filter(
         (completion) => completion.habitId !== habitId || completion.dateKey !== dateKey,
@@ -246,6 +255,7 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
 
     set({ habitCompletions: next.habitCompletions, error: null });
     await savePersistedState(next);
+    if (current) await queueHabitCompletionSync(current, "delete");
   },
   logMedication: async (log) => {
     const dateKey = getLocalDateKey();
@@ -264,9 +274,13 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
 
     set({ medicationLogs: next.medicationLogs, error: null });
     await savePersistedState(next);
+    await queueMedicationLogSync(nextLog, existing ? "update" : "create");
     return nextLog;
   },
   clearMedicationLog: async (medicationId, dateKey = getLocalDateKey()) => {
+    const current = get().medicationLogs.find(
+      (log) => log.medicationId === medicationId && log.dateKey === dateKey,
+    );
     const next = {
       habitCompletions: get().habitCompletions,
       medicationLogs: get().medicationLogs.filter(
@@ -277,6 +291,7 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
 
     set({ medicationLogs: next.medicationLogs, error: null });
     await savePersistedState(next);
+    if (current) await queueMedicationLogSync(current, "delete");
   },
   addCustomRoutine: async (routine) => {
     const nextRoutine = normalizeCustomRoutine(routine);
@@ -288,6 +303,7 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
 
     set({ customRoutines: next.customRoutines, error: null });
     await savePersistedState(next);
+    await queueScheduleRoutineSync(nextRoutine, "create");
     return nextRoutine;
   },
   updateCustomRoutine: async (id, routine) => {
@@ -303,9 +319,11 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
 
     set({ customRoutines: next.customRoutines, error: null });
     await savePersistedState(next);
+    await queueScheduleRoutineSync(nextRoutine, "update");
     return nextRoutine;
   },
   deleteCustomRoutine: async (id) => {
+    const current = get().customRoutines.find((item) => item.id === id);
     const next = {
       habitCompletions: get().habitCompletions,
       medicationLogs: get().medicationLogs,
@@ -314,6 +332,7 @@ export const useScheduleStore = create<ScheduleStoreState>((set, get) => ({
 
     set({ customRoutines: next.customRoutines, error: null });
     await savePersistedState(next);
+    if (current) await queueScheduleRoutineSync(current, "delete");
   },
   disableAllCustomRoutineReminders: async () => {
     const now = new Date().toISOString();

@@ -29,6 +29,17 @@ export type SyncEntityRecord = {
   deletedAt: string | null;
 };
 
+export type SyncEntityExportRecord = {
+  entityType: SyncEntityType;
+  entityId: string;
+  operation: SyncOperation;
+  localUpdatedAt: string;
+  queuedAt: string;
+  retryCount: number;
+  serverUpdatedAt: string;
+  deletedAt: string | null;
+};
+
 const parsePayload = (value: string | null): unknown => {
   if (value === null) return null;
 
@@ -64,6 +75,17 @@ const toQueueItem = (record: SyncEntityRecord): SyncQueueItem => ({
   retryCount: record.retryCount,
 });
 
+const toExportRecord = (record: SyncEntityRecord): SyncEntityExportRecord => ({
+  entityType: record.entityType,
+  entityId: record.entityId,
+  operation: record.operation,
+  localUpdatedAt: record.localUpdatedAt,
+  queuedAt: record.queuedAt,
+  retryCount: record.retryCount,
+  serverUpdatedAt: record.serverUpdatedAt,
+  deletedAt: record.deletedAt,
+});
+
 export class SyncRepository {
   find(userId: string, entityType: SyncEntityType, entityId: string): SyncEntityRecord | null {
     const row = database.prepare(`
@@ -88,6 +110,26 @@ export class SyncRepository {
         `).all(userId) as SyncEntityRow[];
 
     return rows.map(toRecord).map(toQueueItem);
+  }
+
+  listExportRecords(userId: string): SyncEntityExportRecord[] {
+    const rows = database.prepare(`
+      SELECT * FROM sync_entities
+      WHERE user_id = ?
+      ORDER BY server_updated_at ASC
+      LIMIT 1000
+    `).all(userId) as SyncEntityRow[];
+
+    return rows.map(toRecord).map(toExportRecord);
+  }
+
+  deleteAllForUser(userId: string): number {
+    const result = database.prepare(`
+      DELETE FROM sync_entities
+      WHERE user_id = ?
+    `).run(userId);
+
+    return result.changes;
   }
 
   upsert(userId: string, item: SyncQueueItem, serverUpdatedAt: string): SyncEntityRecord {

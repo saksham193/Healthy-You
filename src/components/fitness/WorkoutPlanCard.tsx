@@ -12,7 +12,11 @@ type WorkoutPlanCardProps = {
   completedAt?: string;
   isCompletedToday?: boolean;
   onComplete?: () => void;
+  onDelete?: () => void;
+  onEdit?: () => void;
+  onStart?: () => void;
   onUndoComplete?: () => void;
+  restrictionLabel?: string;
   workout: WorkoutPlan;
 };
 
@@ -20,7 +24,11 @@ export default function WorkoutPlanCard({
   completedAt,
   isCompletedToday,
   onComplete,
+  onDelete,
+  onEdit,
+  onStart,
   onUndoComplete,
+  restrictionLabel,
   workout,
 }: WorkoutPlanCardProps) {
   const tone = getFitnessToneColors(workout.tone);
@@ -38,6 +46,17 @@ export default function WorkoutPlanCard({
       <View style={styles.content}>
         <Text numberOfLines={1} style={styles.title}>{workout.name}</Text>
         <Text numberOfLines={1} style={styles.meta}>{workout.duration}</Text>
+        {workout.notes ? (
+          <Text numberOfLines={2} style={styles.note}>{workout.notes}</Text>
+        ) : null}
+        {workout.userRestrictions?.length ? (
+          <Text numberOfLines={2} style={styles.restrictions}>
+            Restrictions: {workout.userRestrictions.join(", ")}
+          </Text>
+        ) : null}
+        {restrictionLabel ? (
+          <Text numberOfLines={2} style={styles.restrictionWarning}>{restrictionLabel}</Text>
+        ) : null}
       </View>
       <View style={styles.trailing}>
         <View style={[styles.badge, { backgroundColor: tone.background }]}>
@@ -65,17 +84,50 @@ export default function WorkoutPlanCard({
             <Text style={styles.secondaryButtonText}>Undo</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            accessibilityLabel={`Mark ${workout.name} complete`}
-            accessibilityRole="button"
-            activeOpacity={0.82}
-            onPress={onComplete}
-            style={[styles.completeButton, { backgroundColor: tone.foreground }]}
-          >
-            <Ionicons color={COLORS.white} name="checkmark" size={16} />
-            <Text style={styles.completeButtonText}>Complete</Text>
-          </TouchableOpacity>
+          <View style={styles.actionStack}>
+            <TouchableOpacity
+              accessibilityLabel={`Start ${workout.name}`}
+              accessibilityRole="button"
+              activeOpacity={0.82}
+              onPress={onStart}
+              style={[styles.completeButton, { backgroundColor: tone.foreground }]}
+            >
+              <Ionicons color={COLORS.white} name="play" size={16} />
+              <Text style={styles.completeButtonText}>Start</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityLabel={`Mark ${workout.name} complete`}
+              accessibilityRole="button"
+              activeOpacity={0.82}
+              onPress={onComplete}
+              style={styles.secondaryButton}
+            >
+              <Text style={styles.secondaryButtonText}>Complete</Text>
+            </TouchableOpacity>
+          </View>
         )}
+        <View style={styles.editRow}>
+          <TouchableOpacity
+            accessibilityLabel={workout.isCustom ? `Edit ${workout.name}` : `Customize ${workout.name}`}
+            accessibilityRole="button"
+            activeOpacity={0.76}
+            onPress={onEdit}
+            style={styles.iconButton}
+          >
+            <Ionicons color={COLORS.textMuted} name={workout.isCustom ? "create-outline" : "copy-outline"} size={16} />
+          </TouchableOpacity>
+          {workout.isCustom ? (
+            <TouchableOpacity
+              accessibilityLabel={`Delete ${workout.name}`}
+              accessibilityRole="button"
+              activeOpacity={0.76}
+              onPress={onDelete}
+              style={styles.iconButton}
+            >
+              <Ionicons color={COLORS.danger} name="trash-outline" size={16} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     </CustomCard>
   );
@@ -112,6 +164,26 @@ const styles = StyleSheet.create({
   meta: {
     color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.sm,
+    marginTop: SPACING.xs,
+  },
+  note: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 16,
+    marginTop: SPACING.xs,
+  },
+  restrictions: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    lineHeight: 16,
+    marginTop: SPACING.xs,
+  },
+  restrictionWarning: {
+    color: COLORS.warning,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    lineHeight: 16,
     marginTop: SPACING.xs,
   },
   trailing: {
@@ -168,5 +240,21 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  actionStack: {
+    alignItems: "flex-end",
+    gap: SPACING.sm,
+  },
+  editRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  iconButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: SPACING.lg,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
   },
 });

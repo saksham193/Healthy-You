@@ -88,10 +88,15 @@ const toneColor = (tone: Tone): string => {
 
 export default function FoodEducationSection() {
   const [selectedFood, setSelectedFood] = useState<FoodEducationItem | null>(null);
+  const [allFoodsVisible, setAllFoodsVisible] = useState(false);
 
   return (
     <View>
-      <DashboardSection title="Clickable Food Icons" actionLabel="See All" />
+      <DashboardSection
+        actionLabel="See All"
+        onPress={() => setAllFoodsVisible(true)}
+        title="Clickable Food Icons"
+      />
       <ScrollView
         contentContainerStyle={styles.foodRail}
         horizontal
@@ -161,6 +166,52 @@ export default function FoodEducationSection() {
             {selectedFood?.recipes.map((recipe) => (
               <Text key={recipe} style={styles.detailLine}>- {recipe}</Text>
             ))}
+          </CustomCard>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setAllFoodsVisible(false)}
+        transparent
+        visible={allFoodsVisible}
+      >
+        <View style={styles.modalBackdrop}>
+          <CustomCard style={styles.detailSheet}>
+            <View style={styles.sheetHeader}>
+              <View>
+                <Text style={styles.sheetTitle}>Food Education</Text>
+                <Text style={styles.sheetSubtitle}>Local examples and nutrition highlights</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                activeOpacity={0.72}
+                onPress={() => setAllFoodsVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons color={COLORS.text} name="close" size={20} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.allFoodsList}>
+              {foods.map((food) => (
+                <TouchableOpacity
+                  activeOpacity={0.82}
+                  key={food.id}
+                  onPress={() => {
+                    setAllFoodsVisible(false);
+                    setSelectedFood(food);
+                  }}
+                  style={styles.allFoodRow}
+                >
+                  <View style={[styles.allFoodIcon, { backgroundColor: `${toneColor(food.tone)}22` }]}>
+                    <Ionicons color={toneColor(food.tone)} name={food.iconName} size={20} />
+                  </View>
+                  <View style={styles.allFoodCopy}>
+                    <Text style={styles.foodName}>{food.name}</Text>
+                    <Text style={styles.foodBenefit}>{food.benefit}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </CustomCard>
         </View>
       </Modal>
@@ -272,5 +323,26 @@ const styles = StyleSheet.create({
     color: NUTRITION_COLORS.dark,
     fontSize: TYPOGRAPHY.sizes.xs,
     fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  allFoodsList: {
+    marginTop: SPACING.md,
+  },
+  allFoodRow: {
+    alignItems: "center",
+    borderBottomColor: COLORS.border,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+  },
+  allFoodIcon: {
+    alignItems: "center",
+    borderRadius: 16,
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+  allFoodCopy: {
+    flex: 1,
   },
 });

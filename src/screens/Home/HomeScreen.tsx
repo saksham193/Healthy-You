@@ -25,6 +25,7 @@ import { getHomeFeatureToneColors } from "../../utils/tone";
 import type { IconName, RootTabParamList, Tone } from "../../types";
 
 type HomeScreenProps = BottomTabScreenProps<RootTabParamList, "Data">;
+type HealthDetailKind = "activity" | "dashboard" | "glucose";
 type ReportMetric = {
   id: string;
   title: string;
@@ -65,6 +66,7 @@ const formatPercent = (value: number | null): string =>
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [reportPreviewVisible, setReportPreviewVisible] = useState(false);
+  const [healthDetailKind, setHealthDetailKind] = useState<HealthDetailKind | null>(null);
   const { data, error, loading } = useHealthData();
   const healthScore = data.healthScore;
   const vitals = data.vitals;
@@ -271,6 +273,16 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
     Alert.alert("Sleep", "Sleep details are summarized on your dashboard.");
   };
+  const detailTitle = healthDetailKind === "activity"
+    ? "Daily Activity Summary"
+    : healthDetailKind === "dashboard"
+      ? "Health Dashboard"
+      : "Blood Glucose Levels";
+  const detailLines = healthDetailKind === "activity"
+    ? vitals?.healthSummaries.map((summary) => `${summary.title}: ${summary.value} ${summary.suffix}`) ?? []
+    : healthDetailKind === "dashboard"
+      ? vitals?.labels.map((label, index) => `${label}: ${vitals.bloodPressurePoints[index] ?? "No data"}`) ?? []
+      : vitals?.labels.map((label, index) => `${label}: ${vitals.glucosePoints[index] ?? "No data"}`) ?? [];
 
   if (!vitals || !healthScore) {
     return (
@@ -423,7 +435,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             ))}
           </View>
 
-          <DashboardSection title="Daily Activity Summary" actionLabel="See All" />
+          <DashboardSection
+            actionLabel="See All"
+            onPress={() => setHealthDetailKind("activity")}
+            title="Daily Activity Summary"
+          />
 
           <View style={styles.summaryGrid}>
             {vitals.healthSummaries.map((summary) => (
@@ -439,7 +455,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             ))}
           </View>
 
-          <DashboardSection title="Health Dashboard" actionLabel="See All" />
+          <DashboardSection
+            actionLabel="See All"
+            onPress={() => setHealthDetailKind("dashboard")}
+            title="Health Dashboard"
+          />
           <ActivityChart
             labels={vitals.labels}
             accentColor={DATA_COLORS.dark}
@@ -449,7 +469,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             values={vitals.bloodPressurePoints}
           />
 
-          <DashboardSection title="Blood Glucose Levels" actionLabel="See All" />
+          <DashboardSection
+            actionLabel="See All"
+            onPress={() => setHealthDetailKind("glucose")}
+            title="Blood Glucose Levels"
+          />
           <ActivityChart
             accentColor={DATA_COLORS.dark}
             labels={vitals.labels}
@@ -524,6 +548,47 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               accessibilityRole="button"
               activeOpacity={0.76}
               onPress={() => setReportPreviewVisible(false)}
+              style={styles.doneButton}
+            >
+              <Text style={styles.doneButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setHealthDetailKind(null)}
+        transparent
+        visible={Boolean(healthDetailKind)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.reportModal}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.eyebrow}>Local dashboard details</Text>
+                <Text style={styles.modalTitle}>{detailTitle}</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityLabel="Close dashboard details"
+                accessibilityRole="button"
+                onPress={() => setHealthDetailKind(null)}
+                style={styles.closeButton}
+              >
+                <Ionicons color={COLORS.text} name="close-outline" size={28} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.previewScroll}>
+              {detailLines.length > 0 ? detailLines.map((line) => (
+                <Text key={line} style={styles.previewLine}>{line}</Text>
+              )) : (
+                <Text style={styles.previewLine}>No records yet. Add local logs to see more details here.</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              accessibilityLabel="Close dashboard details"
+              accessibilityRole="button"
+              activeOpacity={0.76}
+              onPress={() => setHealthDetailKind(null)}
               style={styles.doneButton}
             >
               <Text style={styles.doneButtonText}>Done</Text>

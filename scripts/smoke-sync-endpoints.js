@@ -62,6 +62,12 @@ const run = async () => {
   const unauthenticatedPull = await requestJson(baseUrl, "GET", "/sync/pull");
   assert(unauthenticatedPull.status === 401, "sync pull must require authentication");
 
+  const unauthenticatedExport = await requestJson(baseUrl, "GET", "/sync/export");
+  assert(unauthenticatedExport.status === 401, "sync export must require authentication");
+
+  const unauthenticatedDelete = await requestJson(baseUrl, "DELETE", "/sync/data");
+  assert(unauthenticatedDelete.status === 401, "sync data deletion must require authentication");
+
   const register = await requestJson(baseUrl, "POST", "/auth/register", {
     email: "sync-smoke@example.com",
     name: "Sync Smoke",
@@ -106,6 +112,27 @@ const run = async () => {
 
   const afterDelete = await requestJson(baseUrl, "GET", "/sync/pull", undefined, token);
   assert(afterDelete.json.data.items[0].operation === "delete", "sync pull should expose delete tombstone");
+
+  const cloudExport = await requestJson(baseUrl, "GET", "/sync/export", undefined, token);
+  assert(cloudExport.status === 200, "sync export should return 200");
+  assert(cloudExport.json.data.status === "ok", "sync export should return ok");
+  assert(cloudExport.json.data.recordCount === 1, "sync export should include one user-scoped sync record");
+  assert(cloudExport.json.data.records[0].payload === undefined, "sync export must not expose payload values");
+  assert(
+    cloudExport.json.data.boundary.includes("external sign-in provider account"),
+    "sync export should document account boundary",
+  );
+
+  const cloudDelete = await requestJson(baseUrl, "DELETE", "/sync/data", undefined, token);
+  assert(cloudDelete.status === 200, "sync data delete should return 200");
+  assert(cloudDelete.json.data.deletedCount === 1, "sync data delete should report deleted user-scoped records");
+  assert(
+    cloudDelete.json.data.boundary.includes("external sign-in provider account"),
+    "sync data delete should document account boundary",
+  );
+
+  const afterCloudDelete = await requestJson(baseUrl, "GET", "/sync/pull", undefined, token);
+  assert(afterCloudDelete.json.data.items.length === 0, "sync pull should be empty after cloud sync data deletion");
 
   console.log("sync endpoint smoke test passed");
 };

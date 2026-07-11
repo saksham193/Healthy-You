@@ -11,6 +11,8 @@ export const syncRoutes = Router();
 
 syncRoutes.post("/push", requireAuth, validateBody(syncPushRequestSchema), syncController.push);
 syncRoutes.get("/pull", requireAuth, syncController.pull);
+syncRoutes.get("/export", requireAuth, syncController.exportData);
+syncRoutes.delete("/data", requireAuth, syncController.deleteData);
 syncRoutes.get("/health-summary", requireAuth, healthSummaryController.list);
 syncRoutes.post("/health-summary", requireAuth, validateBody(healthSummarySchema), healthSummaryController.save);
 syncRoutes.delete("/health-summary/:id", requireAuth, healthSummaryController.remove);

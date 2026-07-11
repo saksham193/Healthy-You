@@ -1,4 +1,12 @@
-import type { SyncPullResponse, SyncPushRequest, SyncPushResponse } from "../types/contracts";
+import type {
+  SyncCloudDataDeleteResponse,
+  SyncCloudExportResponse,
+  SyncEntityType,
+  SyncOperation,
+  SyncPullResponse,
+  SyncPushRequest,
+  SyncPushResponse,
+} from "../types/contracts";
 import { SyncRepository } from "../repositories/SyncRepository";
 
 const SYNC_DISABLED_MESSAGE =
@@ -62,6 +70,43 @@ export class SyncService {
       status: "ok",
       items: this.syncRepository.list(userId, updatedAfter),
       serverUpdatedAt: new Date().toISOString(),
+    };
+  }
+
+  exportData(userId: string): SyncCloudExportResponse {
+    const records = this.syncRepository.listExportRecords(userId);
+    const byEntityType = records.reduce<Record<SyncEntityType, number>>((summary, record) => {
+      summary[record.entityType] = (summary[record.entityType] ?? 0) + 1;
+      return summary;
+    }, {} as Record<SyncEntityType, number>);
+    const byOperation = records.reduce<Record<SyncOperation, number>>((summary, record) => {
+      summary[record.operation] = (summary[record.operation] ?? 0) + 1;
+      return summary;
+    }, {} as Record<SyncOperation, number>);
+
+    return {
+      status: "ok",
+      exportedAt: new Date().toISOString(),
+      boundary:
+        "This exports Healthy You cloud sync record metadata stored by this backend. It does not export files, images, audio, attachments, AI prompts/responses, tokens, or your external sign-in provider account.",
+      recordCount: records.length,
+      records,
+      summary: {
+        byEntityType,
+        byOperation,
+      },
+    };
+  }
+
+  deleteData(userId: string): SyncCloudDataDeleteResponse {
+    const deletedCount = this.syncRepository.deleteAllForUser(userId);
+
+    return {
+      status: "ok",
+      deletedCount,
+      deletedAt: new Date().toISOString(),
+      boundary:
+        "This deleted Healthy You cloud sync records stored by this backend. It did not delete local device data or your external sign-in provider account.",
     };
   }
 }

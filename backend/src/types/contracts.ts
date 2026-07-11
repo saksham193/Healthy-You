@@ -280,7 +280,10 @@ export const healthSummarySchema = z.object({
 
 export const syncEntityTypeSchema = z.enum([
   "nutrition_log",
+  "hydration_log",
   "fitness_log",
+  "habit_completion",
+  "medication_log",
   "schedule_routine",
   "profile_settings",
 ]);
@@ -332,6 +335,36 @@ export const syncPullResponseSchema = z.object({
   serverUpdatedAt: isoDateString,
 }).strict();
 
+export const syncCloudExportRecordSchema = z.object({
+  entityType: syncEntityTypeSchema,
+  entityId: z.string().min(1).max(180),
+  operation: syncOperationSchema,
+  localUpdatedAt: isoDateString,
+  queuedAt: isoDateString,
+  retryCount: z.number().int().min(0).max(100),
+  serverUpdatedAt: isoDateString,
+  deletedAt: isoDateString.nullable(),
+}).strict();
+
+export const syncCloudExportResponseSchema = z.object({
+  status: z.literal("ok"),
+  exportedAt: isoDateString,
+  boundary: z.string().min(1).max(500),
+  recordCount: z.number().int().min(0).max(1000),
+  records: z.array(syncCloudExportRecordSchema).max(1000),
+  summary: z.object({
+    byEntityType: z.record(syncEntityTypeSchema, z.number().int().min(0)),
+    byOperation: z.record(syncOperationSchema, z.number().int().min(0)),
+  }).strict(),
+}).strict();
+
+export const syncCloudDataDeleteResponseSchema = z.object({
+  status: z.literal("ok"),
+  deletedCount: z.number().int().min(0),
+  deletedAt: isoDateString,
+  boundary: z.string().min(1).max(500),
+}).strict();
+
 export const cloudProfileSettingsSchema = z.object({
   displayName: z.string().min(1).max(120).optional(),
   appPreferences: z.record(z.string(), z.unknown()).optional(),
@@ -360,4 +393,6 @@ export type SyncPushRequest = z.infer<typeof syncPushRequestSchema>;
 export type SyncResponse = z.infer<typeof syncResponseSchema>;
 export type SyncPushResponse = z.infer<typeof syncPushResponseSchema>;
 export type SyncPullResponse = z.infer<typeof syncPullResponseSchema>;
+export type SyncCloudExportResponse = z.infer<typeof syncCloudExportResponseSchema>;
+export type SyncCloudDataDeleteResponse = z.infer<typeof syncCloudDataDeleteResponseSchema>;
 export type CloudProfileSettings = z.infer<typeof cloudProfileSettingsSchema>;

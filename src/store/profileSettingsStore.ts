@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
+import { queueProfileSettingsSync } from "../services/sync/syncPayloads";
 
 export type LocalProfileDisplay = {
   name?: string;
@@ -88,9 +89,11 @@ export const useProfileSettingsStore = create<ProfileSettingsStoreState>((set, g
 
     set({ profile: normalized, error: null });
     await savePersistedProfile(normalized);
+    await queueProfileSettingsSync(normalized, "update");
   },
   clearProfile: async () => {
     set({ profile: null, error: null });
     await savePersistedProfile(null);
+    await queueProfileSettingsSync(null, "delete");
   },
 }));
