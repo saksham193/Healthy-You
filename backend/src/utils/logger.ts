@@ -1,13 +1,68 @@
-type LogLevel = "info" | "warn" | "error";
+import { env } from "../config/env";
 
-const write = (level: LogLevel, message: string, meta?: unknown): void => {
-  const payload = meta === undefined ? "" : ` ${JSON.stringify(meta)}`;
+type LogLevel = "debug" | "info" | "warn" | "error";
+type SafeLogValue = string | number | boolean | null | undefined;
+type SafeLogMeta = Record<string, SafeLogValue>;
 
-  console[level](`[${new Date().toISOString()}] ${level.toUpperCase()} ${message}${payload}`);
+const levelPriority: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+};
+
+const allowedMetaKeys = new Set([
+  "requestId",
+  "method",
+  "path",
+  "statusCode",
+  "durationMs",
+  "limiterGroup",
+  "environment",
+  "serviceName",
+  "errorCode",
+  "migrationId",
+  "migrationName",
+  "migrationStatus",
+  "smokeCheck",
+  "port",
+]);
+
+const shouldWrite = (level: LogLevel): boolean =>
+  levelPriority[level] >= levelPriority[env.LOG_LEVEL];
+
+const sanitizeMeta = (meta?: SafeLogMeta): SafeLogMeta | undefined => {
+  if (!meta) return undefined;
+
+  return Object.fromEntries(
+    Object.entries(meta).filter(([key, value]) =>
+      allowedMetaKeys.has(key) &&
+      (typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean" ||
+        value === null ||
+        value === undefined)),
+  );
+};
+
+const write = (level: LogLevel, event: string, meta?: SafeLogMeta): void => {
+  if (!shouldWrite(level)) return;
+
+  const payload = {
+    timestamp: new Date().toISOString(),
+    level,
+    event,
+    serviceName: "healthy-you-backend",
+    environment: env.ENVIRONMENT,
+    ...sanitizeMeta(meta),
+  };
+
+  console[level === "debug" ? "log" : level](JSON.stringify(payload));
 };
 
 export const logger = {
-  info: (message: string, meta?: unknown): void => write("info", message, meta),
-  warn: (message: string, meta?: unknown): void => write("warn", message, meta),
-  error: (message: string, meta?: unknown): void => write("error", message, meta),
+  debug: (event: string, meta?: SafeLogMeta): void => write("debug", event, meta),
+  info: (event: string, meta?: SafeLogMeta): void => write("info", event, meta),
+  warn: (event: string, meta?: SafeLogMeta): void => write("warn", event, meta),
+  error: (event: string, meta?: SafeLogMeta): void => write("error", event, meta),
 };

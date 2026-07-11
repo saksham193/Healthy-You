@@ -1,13 +1,17 @@
 import type { Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import { env } from "../config/env";
+import { recordRateLimitedRequest } from "../monitoring/metrics";
 import { logger } from "../utils/logger";
+import { getSafePath } from "../utils/safePath";
 
 const safeRateLimitHandler = (group: string) =>
   (request: Request, response: Response): void => {
+    recordRateLimitedRequest();
     logger.warn("rate_limited", {
+      requestId: request.requestId,
       method: request.method,
-      path: `${request.baseUrl}${request.path}`,
+      path: getSafePath(`${request.baseUrl}${request.path}`),
       limiterGroup: group,
       statusCode: 429,
     });
@@ -15,6 +19,7 @@ const safeRateLimitHandler = (group: string) =>
     response.status(429).json({
       error: "Too many requests. Please wait and try again.",
       code: "RATE_LIMITED",
+      requestId: request.requestId,
     });
   };
 

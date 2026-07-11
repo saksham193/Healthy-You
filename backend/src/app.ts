@@ -6,6 +6,7 @@ import { env } from "./config/env";
 import { initializeDatabase } from "./database/connection";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { requireJsonContentType } from "./middleware/requestHardening";
+import { requestId } from "./middleware/requestId";
 import { requestLogger } from "./middleware/requestLogger";
 import { apiRateLimit } from "./middleware/security";
 import { aiRoutes } from "./routes/aiRoutes";
@@ -22,6 +23,7 @@ export const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN }));
+app.use(requestId);
 app.use(requestLogger);
 app.use(statusRoutes);
 app.use(apiRateLimit);

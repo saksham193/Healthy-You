@@ -57,6 +57,7 @@
     "backend:start": "node backend/dist/server.js",
     "backend:smoke:hardening": "npm run backend:build && node scripts/smoke-request-hardening.js",
     "backend:smoke:migrations": "npm run backend:build && node scripts/smoke-migrations.js",
+    "backend:smoke:monitoring": "npm run backend:build && node scripts/smoke-monitoring.js",
     "backend:smoke:sync": "node scripts/smoke-sync-endpoints.js",
     "build": "tsc -p tsconfig.json && tsc -p backend/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p backend/tsconfig.json --noEmit",

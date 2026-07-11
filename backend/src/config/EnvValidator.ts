@@ -56,6 +56,10 @@ export const backendEnvSchema = z
     RATE_LIMIT_AUTH_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60_000),
     REQUEST_BODY_LIMIT_JSON: z.string().regex(/^\d+(b|kb|mb)$/i).default("1mb"),
     REQUEST_BODY_LIMIT_AI_IMAGE: z.string().regex(/^\d+(b|kb|mb)$/i).default("6mb"),
+    LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+    REQUEST_ID_HEADER: z.string().regex(/^[A-Za-z0-9-]+$/).default("X-Request-Id"),
+    MONITORING_ENABLED: z.preprocess(parseBoolean, z.boolean()).default(true),
+    MONITORING_SAFE_STATUS_ENABLED: z.preprocess(parseBoolean, z.boolean()).default(true),
   })
   .superRefine((env, context) => {
     if (env.ENVIRONMENT === "production") {
