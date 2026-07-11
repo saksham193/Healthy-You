@@ -7,7 +7,7 @@ export const requestLogger = (request: Request, response: Response, next: NextFu
   response.on("finish", () => {
     logger.info("request", {
       method: request.method,
-      path: request.path,
+      path: request.originalUrl.split("?")[0],
       statusCode: response.statusCode,
       durationMs: Date.now() - startedAt,
     });

@@ -3,7 +3,7 @@ import { HttpError, isHttpError } from "../utils/httpError";
 import { logger } from "../utils/logger";
 
 export const notFoundHandler = (request: Request, _response: Response, next: NextFunction): void => {
-  next(new HttpError(404, "route_not_found", `Route not found: ${request.method} ${request.path}`));
+  next(new HttpError(404, "route_not_found", "Route not found."));
 };
 
 export const errorHandler = (error: unknown, _request: Request, response: Response, _next: NextFunction): void => {
@@ -31,7 +31,23 @@ export const errorHandler = (error: unknown, _request: Request, response: Respon
     return;
   }
 
-  logger.error("unhandled_error", error instanceof Error ? { message: error.message, stack: error.stack } : error);
+  if (
+    error &&
+    typeof error === "object" &&
+    ((error as { type?: unknown }).type === "entity.parse.failed" || error instanceof SyntaxError)
+  ) {
+    response.status(400).json({
+      error: {
+        code: "malformed_json",
+        message: "Request body must be valid JSON.",
+      },
+    });
+    return;
+  }
+
+  logger.error("unhandled_error", {
+    name: error instanceof Error ? error.name : "UnknownError",
+  });
   response.status(500).json({
     error: {
       code: "internal_error",

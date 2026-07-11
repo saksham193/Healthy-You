@@ -9,6 +9,12 @@ const placeholderValues = new Set([
 ]);
 
 const isPlaceholder = (value?: string): boolean => !value || placeholderValues.has(value);
+const parseBoolean = (value: unknown): unknown => {
+  if (value === "true") return true;
+  if (value === "false") return false;
+
+  return value;
+};
 const defaultDatabaseUrl = "file:backend/data/healthy-you.sqlite";
 const normalizeDatabaseLocation = (value?: string): string => (value ?? "")
   .replace(/^file:/, "")
@@ -40,6 +46,16 @@ export const backendEnvSchema = z
     DATABASE_PATH: z.string().min(1).optional(),
     CORS_ORIGIN: z.string().default("*"),
     OPENAI_MODEL: z.string().default("gpt-4.1-mini"),
+    RATE_LIMIT_ENABLED: z.preprocess(parseBoolean, z.boolean()).default(true),
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+    RATE_LIMIT_DEFAULT_MAX: z.coerce.number().int().positive().default(120),
+    RATE_LIMIT_AI_MAX: z.coerce.number().int().positive().default(20),
+    RATE_LIMIT_SYNC_MAX: z.coerce.number().int().positive().default(60),
+    RATE_LIMIT_EXPORT_DELETE_MAX: z.coerce.number().int().positive().default(10),
+    RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().default(20),
+    RATE_LIMIT_AUTH_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60_000),
+    REQUEST_BODY_LIMIT_JSON: z.string().regex(/^\d+(b|kb|mb)$/i).default("1mb"),
+    REQUEST_BODY_LIMIT_AI_IMAGE: z.string().regex(/^\d+(b|kb|mb)$/i).default("6mb"),
   })
   .superRefine((env, context) => {
     if (env.ENVIRONMENT === "production") {
