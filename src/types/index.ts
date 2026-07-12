@@ -1102,7 +1102,7 @@ export type AIResponse = {
   intent: AIIntent;
   response: string;
   suggestions: string[];
-  provider: "mock" | "openai" | "offline";
+  provider: "mock" | "openai" | "offline" | "backend";
   metadata?: AIResponseMetadata;
 };
 
@@ -1178,6 +1178,11 @@ export type AIResponseMetadata = {
   averagePredictionConfidence?: number;
   dataQualityIssues?: number;
   metricDirectAnswerUsed?: boolean;
+  backendProvider?: string;
+  backendFallbackUsed?: boolean;
+  backendRequestId?: string;
+  safetyNotice?: string;
+  runtimeMode?: "backend" | "local" | "fallback";
   deviceDataSource?: AIContext["deviceDataSource"];
   deviceDataStatus?: AIContext["deviceDataStatus"];
   personalizationScore?: number;

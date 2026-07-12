@@ -57,6 +57,7 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
     error: medibotError,
     sendMessage,
     suggestions,
+    runtimeStatus,
   } = useMedibot({
     initialMessages,
   });
@@ -232,6 +233,7 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
                 <View style={[styles.pulseDot, isOffline && styles.offlineDot]} />
                 <Text numberOfLines={1} style={styles.statusText}>{isOffline ? "Offline" : "Online"}</Text>
               </View>
+              <Text numberOfLines={1} style={styles.modeText}>AI mode: {isOffline ? "Fallback" : runtimeStatus.label}</Text>
             </View>
           </CustomCard>
         </AppHeader>
@@ -519,6 +521,12 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontSize: TYPOGRAPHY.sizes.xxl,
     fontWeight: TYPOGRAPHY.weights.heavy,
+  },
+  modeText: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    marginTop: SPACING.xs,
   },
   conversationContent: {
     paddingBottom: SPACING.xl,
