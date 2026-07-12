@@ -8,11 +8,16 @@ import {
   sendBackendMedibotMessage,
   type MedibotRuntimeStatus,
 } from "../services/ai/medibotRuntimeService";
+import type { HealthAIContext } from "../services/ai/healthContext/HealthContextTypes";
 import { useHealthStore } from "../store/healthStore";
 import type { ConversationMessage } from "../types";
 
 type UseMedibotOptions = {
   initialMessages: ConversationMessage[];
+};
+
+type SendMedibotOptions = {
+  healthContext?: HealthAIContext;
 };
 
 export function useMedibot({ initialMessages }: UseMedibotOptions) {
@@ -89,7 +94,7 @@ export function useMedibot({ initialMessages }: UseMedibotOptions) {
     };
   }, []);
 
-  const sendMessage = useCallback(async (message: string) => {
+  const sendMessage = useCallback(async (message: string, options: SendMedibotOptions = {}) => {
     const text = message.trim();
 
     if (!text) return;
@@ -118,7 +123,7 @@ export function useMedibot({ initialMessages }: UseMedibotOptions) {
         markAITiming(timing, "device sync check", { refreshed: false, backgroundRefreshQueued: false });
       }
 
-      let aiResponse = await sendBackendMedibotMessage(text);
+      let aiResponse = await sendBackendMedibotMessage(text, "chat", options.healthContext);
       markAITiming(timing, "service response received", {
         runtimeMode: aiResponse.metadata?.runtimeMode,
         backendProvider: aiResponse.metadata?.backendProvider,
@@ -158,6 +163,8 @@ export function useMedibot({ initialMessages }: UseMedibotOptions) {
             offline: true,
             runtimeMode: "local",
             safetyNotice: "This is general wellness information, not a medical diagnosis or treatment plan.",
+            healthContextUsed: Boolean(options.healthContext),
+            healthContextScope: options.healthContext?.scope,
           },
         };
 
@@ -170,7 +177,11 @@ export function useMedibot({ initialMessages }: UseMedibotOptions) {
           id: fallbackResponse.id,
           role: "assistant",
           message: fallbackResponse.response,
-          metadata: fallbackResponse.metadata,
+          metadata: {
+            ...fallbackResponse.metadata,
+            healthContextUsed: Boolean(options.healthContext),
+            healthContextScope: options.healthContext?.scope,
+          },
         };
 
         setMessages((current) => [...current, assistantMessage]);

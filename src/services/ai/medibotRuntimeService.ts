@@ -1,6 +1,7 @@
 import { ApiRequestError, apiClient } from "../api/ApiClient";
 import { classifyIntent } from "./intentClassifier";
 import type { AIResponse } from "../../types";
+import type { HealthAIContext } from "./healthContext/HealthContextTypes";
 
 const DEFAULT_MEDIBOT_TIMEOUT_MS = 15000;
 const SAFETY_NOTICE = "This is general wellness information, not a medical diagnosis or treatment plan.";
@@ -32,6 +33,7 @@ type BackendMedibotChatResponse = {
   provider: BackendMedibotProvider;
   fallbackUsed: boolean;
   safetyNotice?: string;
+  contextUsed?: boolean;
   requestId?: string;
 };
 
@@ -103,12 +105,14 @@ export async function getMedibotRuntimeStatus(): Promise<MedibotRuntimeStatus> {
 export async function sendBackendMedibotMessage(
   message: string,
   mode: MedibotChatMode = "chat",
+  healthContext?: HealthAIContext,
 ): Promise<AIResponse> {
   const result = await apiClient.post<BackendMedibotChatResponse>(
     "/ai/chat",
     {
       message,
       mode,
+      ...(healthContext ? { healthContext } : {}),
     },
     {
       timeoutMs: getMedibotTimeoutMs(),
@@ -142,6 +146,8 @@ export async function sendBackendMedibotMessage(
       backendRequestId: result.requestId,
       safetyNotice: result.safetyNotice ?? SAFETY_NOTICE,
       runtimeMode: "backend",
+      healthContextUsed: result.contextUsed ?? Boolean(healthContext),
+      healthContextScope: healthContext?.scope,
     },
   };
 }

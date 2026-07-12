@@ -38,9 +38,44 @@ export const aiRequestSchema = z.object({
 
 export const aiChatModeSchema = z.enum(["chat", "nutrition", "fitness", "schedule", "data-insight"]);
 
+export const healthAIContextScopeSchema = z.enum(["today", "recent", "screen"]);
+
+export const healthAIContextSchema = z.object({
+  generatedAt: z.string().max(40),
+  scope: healthAIContextScopeSchema,
+  summary: z.string().min(1).max(1200),
+  today: z.object({
+    steps: z.number().min(0).max(500000).optional(),
+    stepGoal: z.number().min(0).max(500000).optional(),
+    caloriesLogged: z.number().min(0).max(50000).optional(),
+    mealsLogged: z.number().min(0).max(100).optional(),
+    workoutsLogged: z.number().min(0).max(100).optional(),
+    activeMinutes: z.number().min(0).max(1440).optional(),
+    caloriesBurned: z.number().min(0).max(50000).optional(),
+    waterGlasses: z.number().min(0).max(100).optional(),
+    waterGoal: z.number().min(0).max(100).optional(),
+  }).strict().optional(),
+  recent: z.object({
+    nutritionSummary: z.string().max(500).optional(),
+    fitnessSummary: z.string().max(500).optional(),
+    routineSummary: z.string().max(500).optional(),
+    reminderSummary: z.string().max(500).optional(),
+  }).strict().optional(),
+  activeScreen: z.object({
+    name: z.string().min(1).max(80),
+    selectedItemSummary: z.string().max(240).optional(),
+  }).strict().optional(),
+  safety: z.object({
+    medicalAdviceDisclaimer: z.string().min(1).max(240),
+    dataMayBeIncomplete: z.boolean(),
+    contextMinimized: z.literal(true),
+  }).strict(),
+}).strict();
+
 export const aiChatRequestSchema = z.object({
   message: z.string().min(1).max(4000),
   healthContextSummary: z.string().max(2000).optional(),
+  healthContext: healthAIContextSchema.optional(),
   mode: aiChatModeSchema.default("chat"),
 }).strict();
 
@@ -400,6 +435,7 @@ export const cloudProfileSettingsSchema = z.object({
 export type BackendAIRequest = z.infer<typeof aiRequestSchema>;
 export type BackendAIResponse = z.infer<typeof aiResponseSchema>;
 export type BackendAIChatRequest = z.infer<typeof aiChatRequestSchema>;
+export type BackendHealthAIContext = z.infer<typeof healthAIContextSchema>;
 export type BackendNutritionImageAnalysisResponse = z.infer<typeof nutritionImageAnalysisResponseSchema>;
 export type BackendAttachmentAnalysisResponse = z.infer<typeof attachmentAnalysisResponseSchema>;
 export type BackendVoiceTranscriptionResponse = z.infer<typeof voiceTranscriptionResponseSchema>;

@@ -138,8 +138,8 @@ node scripts/validate-ai-quality.js
 - Phase 8B completed fully functional Medibot typed AI chatbot runtime using the backend provider architecture and Android QA.
 - Phase 8C completed attachment analysis runtime with RC3 Android QA closure.
 - Phase 8D completed the backend STT foundation, mock STT provider, voice route, smoke coverage, and safe mobile voice fallback after RC2 Android QA.
-- Phase 8E will focus on AI Screen Integrations and Health Context RAG.
-- Phase 8F will focus on Android AI runtime QA closure.
+- Phase 8E completed privacy-safe health context for Medibot with explicit user control and RC1 Android QA.
+- Next phase: Phase 8F will focus on Android AI runtime QA closure.
 - Phase 9 will focus on store release preparation and compliance assets.
 
 ## Tech Stack

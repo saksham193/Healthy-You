@@ -36,6 +36,11 @@ import {
 import { ApiRequestError } from "../../services/api/ApiClient";
 import { connectivityService } from "../../services/connectivity/ConnectivityService";
 import type { ConnectivityStatus } from "../../services/connectivity/ConnectivityStatus";
+import { buildHealthAIContext } from "../../services/ai/healthContext/HealthContextBuilder";
+import {
+  HEALTH_CONTEXT_USER_COPY,
+  type HealthAIContext,
+} from "../../services/ai/healthContext/HealthContextTypes";
 import { formatBytes, pickMedibotAttachment } from "../../services/media/documentPickerService";
 import { getVoiceInputFoundationStatus } from "../../services/media/voiceInputFoundation";
 import {
@@ -87,6 +92,9 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceTranscription, setVoiceTranscription] = useState<VoiceTranscriptionResult | null>(null);
   const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
+  const [healthContextEnabled, setHealthContextEnabled] = useState(false);
+  const [healthContextBuilding, setHealthContextBuilding] = useState(false);
+  const [healthContextMessage, setHealthContextMessage] = useState<string | null>(null);
   const [transientBotState, setTransientBotState] = useState<MedibotAnimationState | null>(null);
   const transientTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const talkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,6 +106,7 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
   const isOffline = !connectivity.isOnline;
   const attachmentAnalyzed = Boolean(attachmentAnalysis?.supported);
   const botState: MedibotAnimationState = transientBotState ?? (medibotLoading || isTyping ? "thinking" : "idle");
+  const healthContextStatus = healthContextEnabled ? "AI context: Today's app data" : "AI context: Off";
 
   useEffect(() => connectivityService.subscribe(setConnectivity), []);
   useEffect(() => () => {
@@ -119,14 +128,57 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
     }
   };
 
+  const buildContextForSend = async (): Promise<HealthAIContext | undefined> => {
+    if (!healthContextEnabled) return undefined;
+
+    setHealthContextBuilding(true);
+    setHealthContextMessage(null);
+
+    try {
+      const context = await buildHealthAIContext({ scope: "today" });
+      setHealthContextMessage("A minimized summary of today's app data will be used for this message only.");
+      return context;
+    } catch {
+      setHealthContextMessage("Medibot could not prepare app context, so this message was sent without it.");
+      return undefined;
+    } finally {
+      setHealthContextBuilding(false);
+    }
+  };
+  const sendDraftToMedibot = async (text: string) => {
+    const context = await buildContextForSend();
+    await sendMessage(text, { healthContext: context });
+  };
   const handleSend = () => {
     const text = draft.trim();
     if (!text) return;
 
     thinkingStartedAt.current = Date.now();
     showTransientBotState("thinking", 1200);
-    void sendMessage(text);
+    void sendDraftToMedibot(text);
     setDraft("");
+  };
+  const handleToggleHealthContext = () => {
+    if (healthContextEnabled) {
+      setHealthContextEnabled(false);
+      setHealthContextMessage("Health context is off. Medibot will not include app data with messages.");
+      return;
+    }
+
+    Alert.alert(
+      "Use health context",
+      HEALTH_CONTEXT_USER_COPY,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Enable",
+          onPress: () => {
+            setHealthContextEnabled(true);
+            setHealthContextMessage("Health context is on for messages you send from this session.");
+          },
+        },
+      ],
+    );
   };
   const handleAssistantAction = (title: string) => {
     setDraft(`Help me with ${title.toLowerCase()}.`);
@@ -296,7 +348,7 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
 
     thinkingStartedAt.current = Date.now();
     showTransientBotState("thinking", 1200);
-    void sendMessage(text);
+    void sendDraftToMedibot(text);
     setVoiceState("closed");
     setVoiceClip(null);
     setVoiceTranscript("");
@@ -457,6 +509,40 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
             )}
 
             <DashboardSection title="Medibot Chat" />
+            <CustomCard style={styles.contextCard}>
+              <View style={styles.contextHeader}>
+                <View style={[styles.contextIcon, healthContextEnabled && styles.contextIconEnabled]}>
+                  <Ionicons
+                    color={healthContextEnabled ? COLORS.success : COLORS.primary}
+                    name={healthContextEnabled ? "shield-checkmark-outline" : "shield-outline"}
+                    size={18}
+                  />
+                </View>
+                <View style={styles.contextCopy}>
+                  <Text style={styles.contextTitle}>Use health context with Medibot</Text>
+                  <Text style={styles.contextStatus}>
+                    {healthContextBuilding ? "AI context: Preparing today's app data" : healthContextStatus}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  accessibilityLabel={healthContextEnabled ? "Turn health context off" : "Turn health context on"}
+                  accessibilityRole="button"
+                  activeOpacity={0.78}
+                  onPress={handleToggleHealthContext}
+                  style={[styles.contextToggle, healthContextEnabled && styles.contextToggleOn]}
+                >
+                  <Text style={[styles.contextToggleText, healthContextEnabled && styles.contextToggleTextOn]}>
+                    {healthContextEnabled ? "On" : "Off"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.contextDescription}>
+                {healthContextEnabled
+                  ? "A bounded summary is built only when you send a message. No hidden upload or background sync is used."
+                  : "Turn this on when you want Medibot to use a small summary of today's logged app data."}
+              </Text>
+              {healthContextMessage ? <Text style={styles.contextMessage}>{healthContextMessage}</Text> : null}
+            </CustomCard>
             {hasConversation ? (
               <View style={styles.messages}>
                 {messages.map((item) => (
@@ -923,6 +1009,75 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.semibold,
+  },
+  contextCard: {
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+    padding: SPACING.md,
+  },
+  contextHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  contextIcon: {
+    alignItems: "center",
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: SPACING.md,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  contextIconEnabled: {
+    backgroundColor: COLORS.accentLight,
+  },
+  contextCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  contextTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  contextStatus: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    marginTop: SPACING.xs,
+  },
+  contextDescription: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 17,
+  },
+  contextMessage: {
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    lineHeight: 17,
+  },
+  contextToggle: {
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: SPACING.md,
+    minHeight: 34,
+    minWidth: 48,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.sm,
+  },
+  contextToggleOn: {
+    backgroundColor: COLORS.accentLight,
+  },
+  contextToggleText: {
+    color: COLORS.text,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  contextToggleTextOn: {
+    color: COLORS.success,
   },
   welcomeCard: {
     padding: 0,

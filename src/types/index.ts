@@ -1183,6 +1183,8 @@ export type AIResponseMetadata = {
   backendRequestId?: string;
   safetyNotice?: string;
   runtimeMode?: "backend" | "local" | "fallback";
+  healthContextUsed?: boolean;
+  healthContextScope?: "today" | "recent" | "screen";
   deviceDataSource?: AIContext["deviceDataSource"];
   deviceDataStatus?: AIContext["deviceDataStatus"];
   personalizationScore?: number;
