@@ -25,4 +25,5 @@ aiRoutes.get("/providers/status", chatController.getProviderStatus);
 aiRoutes.post("/chat", aiRateLimit, validateBody(aiChatRequestSchema), chatController.chat);
 aiRoutes.post("/message", aiRateLimit, requireAuth, validateBody(aiRequestSchema), controller.sendMessage);
 aiRoutes.post("/nutrition/analyze-image", aiRateLimit, requireAuth, nutritionImageParser, controller.analyzeNutritionImage);
+aiRoutes.post("/attachments/analyze", aiRateLimit, requireAuth, attachmentParser, controller.analyzeAssistantAttachment);
 aiRoutes.post("/assistant/analyze-attachment", aiRateLimit, requireAuth, attachmentParser, controller.analyzeAssistantAttachment);

@@ -5,7 +5,7 @@ import helmet from "helmet";
 import { env } from "./config/env";
 import { initializeDatabase } from "./database/connection";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
-import { requireJsonContentType } from "./middleware/requestHardening";
+import { isRawBodyRoute, requireJsonContentType } from "./middleware/requestHardening";
 import { requestId } from "./middleware/requestId";
 import { requestLogger } from "./middleware/requestLogger";
 import { apiRateLimit } from "./middleware/security";
@@ -28,7 +28,15 @@ app.use(requestLogger);
 app.use(statusRoutes);
 app.use(apiRateLimit);
 app.use(requireJsonContentType);
-app.use(express.json({ limit: env.REQUEST_BODY_LIMIT_JSON }));
+const jsonParser = express.json({ limit: env.REQUEST_BODY_LIMIT_JSON });
+app.use((request, response, next) => {
+  if (isRawBodyRoute(request.path)) {
+    next();
+    return;
+  }
+
+  jsonParser(request, response, next);
+});
 
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);

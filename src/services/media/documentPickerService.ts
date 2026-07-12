@@ -6,12 +6,35 @@ const MAX_PDF_ATTACHMENT_BYTES = 3 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = [
   "application/pdf",
   "application/json",
+  "application/octet-stream",
   "text/csv",
   "text/markdown",
   "text/plain",
 ];
 
 const normalizeMimeType = (mimeType?: string): string => mimeType?.toLowerCase() ?? "application/octet-stream";
+const getSafeExtensionMimeType = (fileName: string): string | null => {
+  const extension = fileName.split(".").pop()?.trim().toLowerCase();
+
+  switch (extension) {
+    case "txt":
+      return "text/plain";
+    case "md":
+    case "markdown":
+      return "text/markdown";
+    case "json":
+      return "application/json";
+    case "pdf":
+      return "application/pdf";
+    default:
+      return null;
+  }
+};
+
+const normalizeAttachmentMimeType = (mimeType: string, fileName: string): string =>
+  mimeType === "application/octet-stream"
+    ? getSafeExtensionMimeType(fileName) ?? mimeType
+    : mimeType;
 
 export const formatBytes = (size?: number): string => {
   if (!size || size <= 0) return "Unknown size";
@@ -24,7 +47,7 @@ export const formatBytes = (size?: number): string => {
 export const pickMedibotAttachment = async (): Promise<MediaPickerResult<PickedAttachment>> => {
   try {
     const result = await DocumentPicker.getDocumentAsync({
-      copyToCacheDirectory: false,
+      copyToCacheDirectory: true,
       multiple: false,
       type: ALLOWED_ATTACHMENT_TYPES,
     });
@@ -38,7 +61,7 @@ export const pickMedibotAttachment = async (): Promise<MediaPickerResult<PickedA
       return { ok: false, reason: "error", message: "Healthy You could not read the selected attachment." };
     }
 
-    const mimeType = normalizeMimeType(asset.mimeType);
+    const mimeType = normalizeAttachmentMimeType(normalizeMimeType(asset.mimeType), asset.name);
     if (!ALLOWED_ATTACHMENT_TYPES.includes(mimeType)) {
       return {
         ok: false,

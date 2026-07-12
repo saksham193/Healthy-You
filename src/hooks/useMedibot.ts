@@ -183,6 +183,17 @@ export function useMedibot({ initialMessages }: UseMedibotOptions) {
     }
   }, [loadHealthData]);
 
+  const appendAssistantMessage = useCallback((message: string, metadata?: ConversationMessage["metadata"]) => {
+    const assistantMessage: ConversationMessage = {
+      id: `assistant-${Date.now()}`,
+      role: "assistant",
+      message,
+      metadata,
+    };
+
+    setMessages((current) => [...current, assistantMessage]);
+  }, []);
+
   return {
     messages,
     loading: isLoading,
@@ -190,6 +201,7 @@ export function useMedibot({ initialMessages }: UseMedibotOptions) {
     isTyping,
     error,
     sendMessage,
+    appendAssistantMessage,
     suggestions,
     runtimeStatus,
   };

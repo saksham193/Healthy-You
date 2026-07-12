@@ -56,6 +56,7 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
     isTyping,
     error: medibotError,
     sendMessage,
+    appendAssistantMessage,
     suggestions,
     runtimeStatus,
   } = useMedibot({
@@ -74,6 +75,7 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
   const messagesInitialized = useRef(false);
   const hasConversation = messages.length > 0;
   const isOffline = !connectivity.isOnline;
+  const attachmentAnalyzed = Boolean(attachmentAnalysis?.supported);
   const botState: MedibotAnimationState = transientBotState ?? (medibotLoading || isTyping ? "thinking" : "idle");
 
   useEffect(() => connectivityService.subscribe(setConnectivity), []);
@@ -128,6 +130,22 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
       const result = await analyzeMedibotAttachment(attachment);
       setAttachmentAnalysis(result);
       setAttachmentAnalysisMessage(null);
+      appendAssistantMessage(
+        [
+          result.supported ? "Attachment summary:" : "Attachment analysis:",
+          result.summary,
+          result.safetyNotice,
+        ].join("\n\n"),
+        {
+          backendProvider: result.provider,
+          backendFallbackUsed: result.fallbackUsed,
+          backendRequestId: result.requestId,
+          fallback: result.fallbackUsed,
+          runtimeMode: "backend",
+          safetyNotice: result.safetyNotice,
+          source: result.provider === "mock" ? "mock" : "cloud",
+        },
+      );
       showTransientBotState("talking", 1600);
     } catch (analysisError) {
       const message = analysisError instanceof ApiRequestError
@@ -136,6 +154,18 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
 
       setAttachmentAnalysis(null);
       setAttachmentAnalysisMessage(message);
+      appendAssistantMessage(
+        [
+          message,
+          "AI summaries are for general wellness support only and are not medical advice.",
+        ].join("\n\n"),
+        {
+          fallback: true,
+          runtimeMode: "fallback",
+          safetyNotice: "AI summaries are for general wellness support only and are not medical advice.",
+          source: "mock",
+        },
+      );
       showTransientBotState("notification", 1500);
     } finally {
       setAttachmentAnalyzing(false);
@@ -146,7 +176,7 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
 
     Alert.alert(
       "Analyze attachment",
-      "Healthy You will upload this attachment to the backend for an AI-generated summary. It will not be saved automatically and is not medical advice.",
+      "Attachment analysis uploads this selected file to the Healthy You backend for processing. Do not upload sensitive documents unless you understand and accept this. AI summaries are for general wellness support only and are not medical advice.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -166,8 +196,8 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
   const handleVoiceNotify = () => {
     showTransientBotState("notification", 1500);
     Alert.alert(
-      "Voice mode coming after beta",
-      "Voice alerts are not enabled in this beta build. Medibot text chat is available now.",
+      "Voice input",
+      "Voice input is not available in this build. Healthy You will not record audio, upload audio, or send a transcript automatically. Medibot text chat is available now.",
     );
   };
   const canSend = draft.trim().length > 0 && !medibotLoading;
@@ -354,10 +384,12 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
               <View style={styles.attachmentCopy}>
                 <Text numberOfLines={1} style={styles.attachmentName}>{selectedAttachment.name}</Text>
                 <Text numberOfLines={1} style={styles.attachmentMeta}>
-                  {selectedAttachment.mimeType} - {formatBytes(selectedAttachment.size)} - not uploaded
+                  {selectedAttachment.mimeType} - {formatBytes(selectedAttachment.size)} - {attachmentAnalyzed ? "analyzed" : "not uploaded"}
                 </Text>
                 <Text numberOfLines={2} style={styles.attachmentSafety}>
-                  This file has not been uploaded or analyzed yet. Choose Analyze to continue.
+                  {attachmentAnalyzed
+                    ? "Uploaded and analyzed after consent. Remove the attachment when you are done."
+                    : "This file has not been uploaded or analyzed yet. Choose Analyze to continue."}
                 </Text>
               </View>
               <TouchableOpacity
@@ -369,7 +401,7 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
                 style={[styles.attachmentAnalyzeButton, attachmentAnalyzing && styles.attachmentAnalyzeButtonDisabled]}
               >
                 <Text numberOfLines={1} style={styles.attachmentAnalyzeText}>
-                  {attachmentAnalyzing ? "Analyzing" : "Analyze"}
+                  {attachmentAnalyzing ? "Analyzing" : attachmentAnalyzed ? "Analyze again" : "Analyze"}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -402,8 +434,8 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
               </Text>
               {attachmentAnalysis ? (
                 <>
-                  <Text style={styles.attachmentResultSafety}>{attachmentAnalysis.safetyNote}</Text>
-                  {attachmentAnalysis.limitations.map((limitation) => (
+                  <Text style={styles.attachmentResultSafety}>{attachmentAnalysis.safetyNotice}</Text>
+                  {(attachmentAnalysis.limitations ?? []).map((limitation) => (
                     <Text key={limitation} style={styles.attachmentLimitation}>- {limitation}</Text>
                   ))}
                 </>

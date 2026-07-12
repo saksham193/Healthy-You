@@ -18,7 +18,9 @@ export default function VoiceAssistantCard({ onNotify }: VoiceAssistantCardProps
       </View>
       <View style={styles.content}>
         <Text style={styles.title}>Voice Assistant</Text>
-        <Text style={styles.description}>Voice mode is coming after beta. Type your message to Medibot for now.</Text>
+        <Text style={styles.description}>
+          Voice input is not available in this build. No audio is recorded, uploaded, or transcribed.
+        </Text>
       </View>
       <TouchableOpacity
         accessibilityLabel="Learn about voice mode"

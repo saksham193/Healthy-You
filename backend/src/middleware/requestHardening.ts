@@ -4,6 +4,7 @@ import { HttpError } from "../utils/httpError";
 const JSON_METHODS = new Set(["POST", "PUT", "PATCH"]);
 const RAW_BODY_PREFIXES = [
   "/ai/nutrition/analyze-image",
+  "/ai/attachments/analyze",
   "/ai/assistant/analyze-attachment",
 ];
 
@@ -18,6 +19,9 @@ const isJsonContentType = (value?: string): boolean => {
   return contentType === "application/json" || Boolean(contentType?.endsWith("+json"));
 };
 
+export const isRawBodyRoute = (path: string): boolean =>
+  RAW_BODY_PREFIXES.some((prefix) => path.startsWith(prefix));
+
 export const requireJsonContentType = (
   request: Request,
   _response: Response,
@@ -28,7 +32,7 @@ export const requireJsonContentType = (
     return;
   }
 
-  if (RAW_BODY_PREFIXES.some((prefix) => request.path.startsWith(prefix))) {
+  if (isRawBodyRoute(request.path)) {
     next();
     return;
   }

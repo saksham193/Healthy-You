@@ -147,10 +147,15 @@ export const nutritionImageAnalysisResponseSchema = z.object({
 
 export const attachmentAnalysisResponseSchema = z.object({
   summary: z.string().min(1).max(2000),
-  safetyNote: z.string().min(1).max(400),
+  safetyNotice: z.string().min(1).max(400),
+  safetyNote: z.string().min(1).max(400).optional(),
+  supported: z.boolean(),
+  provider: z.enum(["mock", "ollama", "gemini", "groq", "openrouter", "huggingface", "openai"]).optional(),
+  fallbackUsed: z.boolean().optional(),
+  requestId: z.string().optional(),
   fileName: z.string().min(1).max(160).optional(),
   fileType: z.string().min(1).max(120).optional(),
-  limitations: z.array(z.string().min(1).max(240)).min(1).max(6),
+  limitations: z.array(z.string().min(1).max(240)).min(1).max(6).optional(),
 }).strict();
 
 export const registerSchema = z.object({

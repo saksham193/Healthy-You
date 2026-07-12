@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import {
   AttachmentAnalysisService,
+  buildUnsupportedAttachmentResponse,
   normalizeAttachmentMimeType,
   validateAttachmentPayload,
 } from "../services/AttachmentAnalysisService";
@@ -33,12 +34,24 @@ export class AIController {
   };
 
   analyzeAssistantAttachment = async (request: Request, response: Response): Promise<void> => {
+    const mimeType = normalizeAttachmentMimeType(request.header("content-type"));
+
+    if (!mimeType) {
+      response.json({ data: buildUnsupportedAttachmentResponse(request.requestId) });
+      return;
+    }
+
     const payload = validateAttachmentPayload(
       request.body,
-      normalizeAttachmentMimeType(request.header("content-type")),
+      mimeType,
       request.header("x-healthy-you-filename"),
     );
 
-    response.json({ data: await this.attachmentAnalysis.analyzeAttachment(payload) });
+    response.json({
+      data: await this.attachmentAnalysis.analyzeAttachment({
+        ...payload,
+        requestId: request.requestId,
+      }),
+    });
   };
 }
