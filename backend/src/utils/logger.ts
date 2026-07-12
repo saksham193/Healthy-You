@@ -26,6 +26,9 @@ const allowedMetaKeys = new Set([
   "migrationStatus",
   "smokeCheck",
   "port",
+  "provider",
+  "fallbackProvider",
+  "fallbackUsed",
 ]);
 
 const shouldWrite = (level: LogLevel): boolean =>

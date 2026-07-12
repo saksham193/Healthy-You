@@ -36,6 +36,14 @@ export const aiRequestSchema = z.object({
   traceId: z.string().optional(),
 });
 
+export const aiChatModeSchema = z.enum(["chat", "nutrition", "fitness", "schedule", "data-insight"]);
+
+export const aiChatRequestSchema = z.object({
+  message: z.string().min(1).max(4000),
+  healthContextSummary: z.string().max(2000).optional(),
+  mode: aiChatModeSchema.default("chat"),
+}).strict();
+
 export const aiResponseSchema = z.object({
   id: z.string(),
   intent: aiRequestSchema.shape.intent,
@@ -378,6 +386,7 @@ export const cloudProfileSettingsSchema = z.object({
 
 export type BackendAIRequest = z.infer<typeof aiRequestSchema>;
 export type BackendAIResponse = z.infer<typeof aiResponseSchema>;
+export type BackendAIChatRequest = z.infer<typeof aiChatRequestSchema>;
 export type BackendNutritionImageAnalysisResponse = z.infer<typeof nutritionImageAnalysisResponseSchema>;
 export type BackendAttachmentAnalysisResponse = z.infer<typeof attachmentAnalysisResponseSchema>;
 export type RegisterBody = z.infer<typeof registerSchema>;

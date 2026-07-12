@@ -133,7 +133,14 @@ node scripts/validate-ai-quality.js
 - Phase 7D completed privacy-safe structured logging, request IDs, and safe monitoring readiness.
 - Phase 7E completed SQLite backup readiness, rollback planning, and production deployment checklist hardening.
 - Phase 7F completed production release candidate validation for backend readiness and Android RC packaging.
-- Phase 8A will focus on store release preparation and compliance assets.
+- Store release preparation is deferred until after AI runtime completion.
+- Phase 8A adds backend AI provider runtime architecture with safe mock and local Ollama-compatible provider foundations.
+- Phase 8B will focus on a fully functional Medibot AI chatbot.
+- Phase 8C will focus on attachment analysis runtime.
+- Phase 8D will focus on voice/STT runtime without adding microphone permissions until explicitly approved.
+- Phase 8E will focus on AI-powered screen integrations.
+- Phase 8F will focus on Android AI runtime QA closure.
+- Phase 9 will focus on store release preparation and compliance assets.
 
 ## Tech Stack
 

@@ -42,6 +42,16 @@ export const backendEnvSchema = z
     ACCESS_TOKEN_TTL: z.string().default("15m"),
     REFRESH_TOKEN_TTL: z.string().default("30d"),
     OPENAI_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+    AI_PROVIDER: z.enum(["mock", "ollama", "gemini", "groq", "openrouter", "huggingface", "openai"]).default("mock"),
+    AI_FALLBACK_PROVIDER: z.enum(["mock", "ollama"]).default("mock"),
+    AI_SAFETY_GUARD_ENABLED: z.preprocess(parseBoolean, z.boolean()).default(true),
+    AI_PROVIDER_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+    OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
+    OLLAMA_MODEL: z.string().min(1).default("llama3.1"),
+    GEMINI_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+    GROQ_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+    OPENROUTER_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+    HUGGINGFACE_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
     DATABASE_URL: z.string().min(1).default(defaultDatabaseUrl),
     DATABASE_PATH: z.string().min(1).optional(),
     CORS_ORIGIN: z.string().default("*"),
@@ -71,7 +81,7 @@ export const backendEnvSchema = z
         });
       }
 
-      if (isPlaceholder(env.OPENAI_API_KEY)) {
+      if (env.AI_PROVIDER === "openai" && isPlaceholder(env.OPENAI_API_KEY)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Production requires OPENAI_API_KEY to be supplied by the deployment secret store.",
