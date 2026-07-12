@@ -59,6 +59,7 @@
     "backend:smoke:backup": "npm run backend:build && node scripts/smoke-backup.js",
     "backend:smoke:ai": "node scripts/smoke-ai-provider.js",
     "backend:smoke:ai:attachments": "node scripts/smoke-ai-attachments.js",
+    "backend:smoke:ai:voice": "node scripts/smoke-ai-voice.js",
     "backend:smoke:hardening": "npm run backend:build && node scripts/smoke-request-hardening.js",
     "backend:smoke:migrations": "npm run backend:build && node scripts/smoke-migrations.js",
     "backend:smoke:monitoring": "npm run backend:build && node scripts/smoke-monitoring.js",

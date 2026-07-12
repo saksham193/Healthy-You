@@ -158,6 +158,14 @@ export const attachmentAnalysisResponseSchema = z.object({
   limitations: z.array(z.string().min(1).max(240)).min(1).max(6).optional(),
 }).strict();
 
+export const voiceTranscriptionResponseSchema = z.object({
+  transcript: z.string().min(1).max(4000),
+  provider: z.enum(["mock", "vosk", "whisper_cpp", "openai_whisper"]),
+  fallbackUsed: z.boolean(),
+  safetyNotice: z.string().min(1).max(400),
+  requestId: z.string().optional(),
+}).strict();
+
 export const registerSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1).max(120),
@@ -394,6 +402,7 @@ export type BackendAIResponse = z.infer<typeof aiResponseSchema>;
 export type BackendAIChatRequest = z.infer<typeof aiChatRequestSchema>;
 export type BackendNutritionImageAnalysisResponse = z.infer<typeof nutritionImageAnalysisResponseSchema>;
 export type BackendAttachmentAnalysisResponse = z.infer<typeof attachmentAnalysisResponseSchema>;
+export type BackendVoiceTranscriptionResponse = z.infer<typeof voiceTranscriptionResponseSchema>;
 export type RegisterBody = z.infer<typeof registerSchema>;
 export type LoginBody = z.infer<typeof loginSchema>;
 export type RefreshTokenBody = z.infer<typeof refreshTokenSchema>;

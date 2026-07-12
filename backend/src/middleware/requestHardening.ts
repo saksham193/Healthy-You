@@ -6,6 +6,7 @@ const RAW_BODY_PREFIXES = [
   "/ai/nutrition/analyze-image",
   "/ai/attachments/analyze",
   "/ai/assistant/analyze-attachment",
+  "/ai/voice/transcribe",
 ];
 
 const hasBody = (request: Request): boolean =>

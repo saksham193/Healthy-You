@@ -19,7 +19,7 @@ export default function VoiceAssistantCard({ onNotify }: VoiceAssistantCardProps
       <View style={styles.content}>
         <Text style={styles.title}>Voice Assistant</Text>
         <Text style={styles.description}>
-          Voice input is not available in this build. No audio is recorded, uploaded, or transcribed.
+          Voice recording is safely paused in this RC. No audio is recorded, uploaded, or sent automatically.
         </Text>
       </View>
       <TouchableOpacity

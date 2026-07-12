@@ -29,13 +29,23 @@ import { useMedibot } from "../../hooks/useMedibot";
 import {
   AI_ATTACHMENT_ANALYSIS_UNAVAILABLE_MESSAGE,
   analyzeMedibotAttachment,
+  transcribeMedibotVoiceClip,
   type AttachmentAnalysisResult,
+  type VoiceTranscriptionResult,
 } from "../../services/api/AIApi";
 import { ApiRequestError } from "../../services/api/ApiClient";
 import { connectivityService } from "../../services/connectivity/ConnectivityService";
 import type { ConnectivityStatus } from "../../services/connectivity/ConnectivityStatus";
 import { formatBytes, pickMedibotAttachment } from "../../services/media/documentPickerService";
 import { getVoiceInputFoundationStatus } from "../../services/media/voiceInputFoundation";
+import {
+  cancelActiveVoiceRecording,
+  requestVoiceRecordingPermission,
+  startVoiceRecording,
+  stopVoiceRecording,
+  VOICE_RECORDING_MAX_DURATION_SECONDS,
+  type VoiceRecordingClip,
+} from "../../services/media/voiceRecordingService";
 import { COLORS } from "../../theme/colors";
 import { SHADOWS } from "../../theme/shadows";
 import { SPACING } from "../../theme/spacing";
@@ -45,6 +55,11 @@ import type { RootTabParamList } from "../../types";
 import type { PickedAttachment } from "../../services/media/mediaTypes";
 
 type AssistantScreenProps = BottomTabScreenProps<RootTabParamList, "Chat">;
+type VoiceFlowState = "closed" | "unavailable" | "ready" | "recording" | "recorded" | "transcribing" | "transcript" | "failed";
+
+const VOICE_TRANSCRIPT_REVIEW_NOTICE = "Review and edit the transcript before sending it to Medibot.";
+const VOICE_LOCAL_FALLBACK_TRANSCRIPT =
+  "Voice transcription is unavailable right now. Please edit this text or type your message before sending it to Medibot.";
 
 export default function AssistantScreen({ route }: AssistantScreenProps) {
   const { data, error, loading: assistantLoading } = useAssistantData();
@@ -67,9 +82,15 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
   const [attachmentAnalysis, setAttachmentAnalysis] = useState<AttachmentAnalysisResult | null>(null);
   const [attachmentAnalysisMessage, setAttachmentAnalysisMessage] = useState<string | null>(null);
   const [attachmentAnalyzing, setAttachmentAnalyzing] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceFlowState>("closed");
+  const [voiceClip, setVoiceClip] = useState<VoiceRecordingClip | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceTranscription, setVoiceTranscription] = useState<VoiceTranscriptionResult | null>(null);
+  const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
   const [transientBotState, setTransientBotState] = useState<MedibotAnimationState | null>(null);
   const transientTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const talkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voiceLimitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const thinkingStartedAt = useRef<number | null>(null);
   const lastAssistantMessageId = useRef<string | null>(null);
   const messagesInitialized = useRef(false);
@@ -82,12 +103,20 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
   useEffect(() => () => {
     if (transientTimer.current) clearTimeout(transientTimer.current);
     if (talkTimer.current) clearTimeout(talkTimer.current);
+    if (voiceLimitTimer.current) clearTimeout(voiceLimitTimer.current);
+    void cancelActiveVoiceRecording();
   }, []);
 
   const showTransientBotState = (state: MedibotAnimationState, durationMs: number) => {
     if (transientTimer.current) clearTimeout(transientTimer.current);
     setTransientBotState(state);
     transientTimer.current = setTimeout(() => setTransientBotState(null), durationMs);
+  };
+  const clearVoiceLimitTimer = () => {
+    if (voiceLimitTimer.current) {
+      clearTimeout(voiceLimitTimer.current);
+      voiceLimitTimer.current = null;
+    }
   };
 
   const handleSend = () => {
@@ -188,19 +217,153 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
       ],
     );
   };
+  const resetVoiceFlow = () => {
+    clearVoiceLimitTimer();
+    void cancelActiveVoiceRecording();
+    setVoiceState("closed");
+    setVoiceClip(null);
+    setVoiceTranscript("");
+    setVoiceTranscription(null);
+    setVoiceMessage(null);
+  };
+  const handleStopVoiceRecording = async () => {
+    clearVoiceLimitTimer();
+
+    try {
+      const clip = await stopVoiceRecording();
+      setVoiceClip(clip);
+      setVoiceState("recorded");
+      setVoiceMessage("Recording stopped. Tap Transcribe to upload this short clip for transcription.");
+      showTransientBotState("notification", 1200);
+    } catch {
+      setVoiceState("failed");
+      setVoiceMessage("Healthy You could not save the recording. You can try again or keep typing.");
+      showTransientBotState("notification", 1500);
+    }
+  };
+  const handleStartVoiceRecording = async () => {
+    setVoiceMessage(null);
+    setVoiceTranscript("");
+    setVoiceTranscription(null);
+
+    try {
+      await startVoiceRecording();
+      setVoiceClip(null);
+      setVoiceState("recording");
+      showTransientBotState("listening", 1800);
+      voiceLimitTimer.current = setTimeout(() => {
+        void handleStopVoiceRecording();
+      }, VOICE_RECORDING_MAX_DURATION_SECONDS * 1000);
+    } catch {
+      setVoiceState("failed");
+      setVoiceMessage("Recording could not start. You can continue typing your message.");
+      showTransientBotState("notification", 1500);
+    }
+  };
+  const handleTranscribeVoiceClip = async () => {
+    if (!voiceClip || voiceState === "transcribing") return;
+
+    setVoiceState("transcribing");
+    setVoiceMessage("Transcribing after your confirmation...");
+    showTransientBotState("thinking", 1600);
+
+    try {
+      const result = await transcribeMedibotVoiceClip(voiceClip);
+      setVoiceTranscription(result);
+      setVoiceTranscript(result.transcript);
+      setVoiceClip(null);
+      setVoiceState("transcript");
+      setVoiceMessage(result.fallbackUsed ? "Demo transcription returned. Review and edit before sending." : null);
+      showTransientBotState("talking", 1400);
+    } catch {
+      const fallback: VoiceTranscriptionResult = {
+        transcript: VOICE_LOCAL_FALLBACK_TRANSCRIPT,
+        provider: "mock",
+        fallbackUsed: true,
+        safetyNotice: VOICE_TRANSCRIPT_REVIEW_NOTICE,
+      };
+      setVoiceTranscription(fallback);
+      setVoiceTranscript(fallback.transcript);
+      setVoiceClip(null);
+      setVoiceState("transcript");
+      setVoiceMessage("Transcription service was unavailable, so a safe editable fallback is shown.");
+      showTransientBotState("notification", 1500);
+    }
+  };
+  const handleSendVoiceTranscript = () => {
+    const text = voiceTranscript.trim();
+    if (!text || medibotLoading) return;
+
+    thinkingStartedAt.current = Date.now();
+    showTransientBotState("thinking", 1200);
+    void sendMessage(text);
+    setVoiceState("closed");
+    setVoiceClip(null);
+    setVoiceTranscript("");
+    setVoiceTranscription(null);
+    setVoiceMessage(null);
+  };
+  const handleRetryVoice = () => {
+    clearVoiceLimitTimer();
+    void cancelActiveVoiceRecording();
+    setVoiceClip(null);
+    setVoiceTranscript("");
+    setVoiceTranscription(null);
+    setVoiceMessage(null);
+    setVoiceState("ready");
+  };
   const handleVoicePress = () => {
     const status = getVoiceInputFoundationStatus();
-    showTransientBotState(status.state === "unavailable" ? "notification" : "listening", 1800);
-    Alert.alert(status.title, `${status.message}\n\n${status.safetyNote}`);
+    showTransientBotState("notification", 1500);
+
+    if (!status.available) {
+      setVoiceState("unavailable");
+      setVoiceClip(null);
+      setVoiceTranscript("");
+      setVoiceTranscription(null);
+      setVoiceMessage(status.safetyNote);
+      Alert.alert(status.title, `${status.message}\n\n${status.safetyNote}`);
+      return;
+    }
+
+    Alert.alert(
+      status.title,
+      `${status.message}\n\n${status.safetyNote}`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: () => {
+            void requestVoiceRecordingPermission().then((permission) => {
+              if (!permission.granted) {
+                setVoiceState("failed");
+                setVoiceMessage(permission.unavailableReason ?? "Microphone permission was not granted. You can continue typing your message.");
+                showTransientBotState("notification", 1500);
+                return;
+              }
+
+              setVoiceState("ready");
+              setVoiceMessage("Ready to record a short clip. Recording starts only after you tap Start Recording.");
+              showTransientBotState("listening", 1400);
+            }).catch(() => {
+              setVoiceState("failed");
+              setVoiceMessage("Microphone permission could not be checked. You can continue typing.");
+              showTransientBotState("notification", 1500);
+            });
+          },
+        },
+      ],
+    );
   };
   const handleVoiceNotify = () => {
     showTransientBotState("notification", 1500);
     Alert.alert(
-      "Voice input",
-      "Voice input is not available in this build. Healthy You will not record audio, upload audio, or send a transcript automatically. Medibot text chat is available now.",
+      "Voice input safety",
+      "Voice recording is safely paused in this RC2 build. Healthy You will not request microphone permission, record audio, upload audio, or send a transcript automatically. Medibot text chat is available now.",
     );
   };
   const canSend = draft.trim().length > 0 && !medibotLoading;
+  const canSendVoiceTranscript = voiceTranscript.trim().length > 0 && !medibotLoading;
 
   useEffect(() => {
     const initialPrompt = route.params?.initialPrompt?.trim();
@@ -444,6 +607,188 @@ export default function AssistantScreen({ route }: AssistantScreenProps) {
                   AI summaries are for general wellness support only and are not medical advice.
                 </Text>
               )}
+            </View>
+          ) : null}
+
+          {voiceState !== "closed" ? (
+            <View style={styles.voicePanel}>
+              <View style={styles.voiceHeader}>
+                <View style={styles.voiceIcon}>
+                  <Ionicons
+                    color={voiceState === "recording" ? COLORS.danger : COLORS.primary}
+                    name={voiceState === "recording" ? "radio-button-on-outline" : "mic-outline"}
+                    size={18}
+                  />
+                </View>
+                <View style={styles.voiceCopy}>
+                  <Text style={styles.voiceTitle}>Voice input</Text>
+                  <Text style={styles.voiceStatus}>
+                    {voiceState === "ready" ? "Ready to record after your tap." :
+                      voiceState === "recording" ? `Recording. Maximum ${VOICE_RECORDING_MAX_DURATION_SECONDS} seconds.` :
+                        voiceState === "recorded" ? "Recording stopped. Transcribe when ready." :
+                          voiceState === "transcribing" ? "Transcribing after confirmation." :
+                            voiceState === "transcript" ? "Transcript ready for review." :
+                              voiceState === "unavailable" ? "Voice recording is paused in RC2." :
+                                "Voice input fallback is active."}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  accessibilityLabel="Close voice input"
+                  accessibilityRole="button"
+                  activeOpacity={0.78}
+                  onPress={resetVoiceFlow}
+                  style={styles.voiceIconButton}
+                >
+                  <Ionicons color={COLORS.textMuted} name="close-outline" size={18} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.voiceSafety}>
+                Healthy You does not record in the background. Audio uploads only after Transcribe, and transcript send requires your confirmation.
+              </Text>
+              {voiceMessage ? <Text style={styles.voiceMessage}>{voiceMessage}</Text> : null}
+
+              {voiceState === "ready" ? (
+                <View style={styles.voiceActions}>
+                  <TouchableOpacity
+                    accessibilityLabel="Start voice recording"
+                    accessibilityRole="button"
+                    activeOpacity={0.82}
+                    onPress={handleStartVoiceRecording}
+                    style={styles.voicePrimaryButton}
+                  >
+                    <Ionicons color={COLORS.white} name="mic-outline" size={16} />
+                    <Text style={styles.voicePrimaryText}>Start Recording</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityLabel="Cancel voice input"
+                    accessibilityRole="button"
+                    activeOpacity={0.78}
+                    onPress={resetVoiceFlow}
+                    style={styles.voiceSecondaryButton}
+                  >
+                    <Text style={styles.voiceSecondaryText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {voiceState === "unavailable" || voiceState === "failed" ? (
+                <View style={styles.voiceActions}>
+                  <TouchableOpacity
+                    accessibilityLabel="Close voice fallback"
+                    accessibilityRole="button"
+                    activeOpacity={0.78}
+                    onPress={resetVoiceFlow}
+                    style={styles.voiceSecondaryButton}
+                  >
+                    <Text style={styles.voiceSecondaryText}>Keep Typing</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {voiceState === "recording" ? (
+                <View style={styles.voiceActions}>
+                  <TouchableOpacity
+                    accessibilityLabel="Stop voice recording"
+                    accessibilityRole="button"
+                    activeOpacity={0.82}
+                    onPress={() => void handleStopVoiceRecording()}
+                    style={styles.voiceDangerButton}
+                  >
+                    <Ionicons color={COLORS.white} name="stop-outline" size={16} />
+                    <Text style={styles.voicePrimaryText}>Stop</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityLabel="Cancel recording"
+                    accessibilityRole="button"
+                    activeOpacity={0.78}
+                    onPress={resetVoiceFlow}
+                    style={styles.voiceSecondaryButton}
+                  >
+                    <Text style={styles.voiceSecondaryText}>Cancel/Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {voiceState === "recorded" || voiceState === "transcribing" ? (
+                <View style={styles.voiceActions}>
+                  <TouchableOpacity
+                    accessibilityLabel="Transcribe voice recording"
+                    accessibilityRole="button"
+                    activeOpacity={0.82}
+                    disabled={voiceState === "transcribing"}
+                    onPress={() => void handleTranscribeVoiceClip()}
+                    style={[styles.voicePrimaryButton, voiceState === "transcribing" && styles.voiceButtonDisabled]}
+                  >
+                    <Ionicons color={COLORS.white} name="text-outline" size={16} />
+                    <Text style={styles.voicePrimaryText}>
+                      {voiceState === "transcribing" ? "Transcribing" : "Transcribe"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityLabel="Retry voice recording"
+                    accessibilityRole="button"
+                    activeOpacity={0.78}
+                    disabled={voiceState === "transcribing"}
+                    onPress={handleRetryVoice}
+                    style={styles.voiceSecondaryButton}
+                  >
+                    <Text style={styles.voiceSecondaryText}>Retry</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityLabel="Delete voice recording"
+                    accessibilityRole="button"
+                    activeOpacity={0.78}
+                    disabled={voiceState === "transcribing"}
+                    onPress={resetVoiceFlow}
+                    style={styles.voiceSecondaryButton}
+                  >
+                    <Text style={styles.voiceSecondaryText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {voiceState === "transcript" ? (
+                <>
+                  <Text style={styles.voiceReviewLabel}>Review and edit transcript</Text>
+                  <TextInput
+                    accessibilityLabel="Voice transcript review"
+                    multiline
+                    onChangeText={setVoiceTranscript}
+                    placeholder="Review transcript before sending..."
+                    placeholderTextColor={COLORS.textMuted}
+                    style={styles.voiceTranscriptInput}
+                    value={voiceTranscript}
+                  />
+                  {voiceTranscription ? (
+                    <Text style={styles.voiceSafety}>
+                      {voiceTranscription.safetyNotice}
+                    </Text>
+                  ) : null}
+                  <View style={styles.voiceActions}>
+                    <TouchableOpacity
+                      accessibilityLabel="Send transcript to Medibot"
+                      accessibilityRole="button"
+                      activeOpacity={0.82}
+                      disabled={!canSendVoiceTranscript}
+                      onPress={handleSendVoiceTranscript}
+                      style={[styles.voicePrimaryButton, !canSendVoiceTranscript && styles.voiceButtonDisabled]}
+                    >
+                      <Ionicons color={COLORS.white} name="send" size={16} />
+                      <Text style={styles.voicePrimaryText}>Send to Medibot</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      accessibilityLabel="Retry voice recording"
+                      accessibilityRole="button"
+                      activeOpacity={0.78}
+                      onPress={handleRetryVoice}
+                      style={styles.voiceSecondaryButton}
+                    >
+                      <Text style={styles.voiceSecondaryText}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : null}
             </View>
           ) : null}
 
@@ -695,6 +1040,124 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: TYPOGRAPHY.sizes.xs,
     lineHeight: 17,
+  },
+  voicePanel: {
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.border,
+    borderRadius: SPACING.lg,
+    borderWidth: 1,
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+    padding: SPACING.md,
+  },
+  voiceHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  voiceIcon: {
+    alignItems: "center",
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: SPACING.md,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  voiceCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  voiceTitle: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  voiceStatus: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    marginTop: SPACING.xs,
+  },
+  voiceIconButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: SPACING.md,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  voiceSafety: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 17,
+  },
+  voiceMessage: {
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    lineHeight: 17,
+  },
+  voiceActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  voicePrimaryButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    borderRadius: SPACING.md,
+    flexDirection: "row",
+    gap: SPACING.xs,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: SPACING.md,
+  },
+  voiceDangerButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.danger,
+    borderRadius: SPACING.md,
+    flexDirection: "row",
+    gap: SPACING.xs,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: SPACING.md,
+  },
+  voiceButtonDisabled: {
+    opacity: 0.55,
+  },
+  voicePrimaryText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  voiceSecondaryButton: {
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: SPACING.md,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: SPACING.md,
+  },
+  voiceSecondaryText: {
+    color: COLORS.text,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  voiceReviewLabel: {
+    color: COLORS.black,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  voiceTranscriptInput: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderColor: COLORS.border,
+    borderRadius: SPACING.md,
+    borderWidth: 1,
+    color: COLORS.text,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: 19,
+    minHeight: 88,
+    padding: SPACING.sm,
+    textAlignVertical: "top",
   },
   inputBar: {
     alignItems: "center",

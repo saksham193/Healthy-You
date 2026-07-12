@@ -5,7 +5,9 @@ import { ApiRequestError, apiClient } from "./ApiClient";
 const DEFAULT_AI_TIMEOUT_MS = 11000;
 const DEFAULT_AI_VISION_TIMEOUT_MS = 25000;
 const DEFAULT_AI_ATTACHMENT_TIMEOUT_MS = 25000;
+const DEFAULT_AI_VOICE_TIMEOUT_MS = 25000;
 const AI_FOOD_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
+const AI_VOICE_MAX_BYTES = 5 * 1024 * 1024;
 const AI_FOOD_IMAGE_SUPPORTED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const AI_ATTACHMENT_MAX_BYTES = 1 * 1024 * 1024;
 const AI_ATTACHMENT_TEXT_MAX_CHARS = 8000;
@@ -63,6 +65,14 @@ export type AttachmentAnalysisResult = {
   limitations?: string[];
 };
 
+export type VoiceTranscriptionResult = {
+  transcript: string;
+  provider: "mock" | "vosk" | "whisper_cpp" | "openai_whisper";
+  fallbackUsed: boolean;
+  safetyNotice: string;
+  requestId?: string;
+};
+
 const getAITimeoutMs = (): number => {
   const configured = Number.parseInt(
     (globalThis as { process?: { env?: { EXPO_PUBLIC_AI_PROVIDER_TIMEOUT_MS?: string } } }).process?.env
@@ -104,6 +114,16 @@ const getAIAttachmentTimeoutMs = (): number => {
   );
 
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_AI_ATTACHMENT_TIMEOUT_MS;
+};
+
+const getAIVoiceTimeoutMs = (): number => {
+  const configured = Number.parseInt(
+    (globalThis as { process?: { env?: { EXPO_PUBLIC_AI_VOICE_TIMEOUT_MS?: string } } }).process?.env
+      ?.EXPO_PUBLIC_AI_VOICE_TIMEOUT_MS ?? "",
+    10,
+  );
+
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_AI_VOICE_TIMEOUT_MS;
 };
 
 export async function analyzeFoodImageDraft(draft: FoodScanImageDraft): Promise<NutritionImageAnalysisDraft> {
@@ -365,4 +385,30 @@ export async function analyzeMedibotAttachment(attachment: PickedAttachment): Pr
   } catch {
     return buildLocalAttachmentFallback(attachment, mimeType, text);
   }
+}
+
+export async function transcribeMedibotVoiceClip(params: {
+  uri: string;
+  mimeType: string;
+  durationSeconds: number;
+}): Promise<VoiceTranscriptionResult> {
+  const localResponse = await fetch(params.uri);
+  const blob = await localResponse.blob();
+
+  if (blob.size > AI_VOICE_MAX_BYTES) {
+    throw new ApiRequestError(413, "audio_too_large", "Voice recording must be 5 MB or smaller.");
+  }
+
+  return apiClient.postBinary<VoiceTranscriptionResult>(
+    "/ai/voice/transcribe",
+    blob,
+    params.mimeType,
+    {
+      authenticated: true,
+      headers: {
+        "X-Healthy-You-Audio-Duration-Seconds": String(params.durationSeconds),
+      },
+      timeoutMs: getAIVoiceTimeoutMs(),
+    },
+  );
 }

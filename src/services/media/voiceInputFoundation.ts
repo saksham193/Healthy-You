@@ -11,7 +11,7 @@ export const getVoiceInputFoundationStatus = (): VoiceInputFoundationStatus => (
   state: "unavailable",
   title: "Voice input",
   message:
-    "Voice input is not available in this build. You can continue typing your message.",
+    "Voice recording is unavailable in this RC2 build. You can still type your message to Medibot.",
   safetyNote:
-    "Healthy You will not record audio, upload audio, or send a transcript automatically.",
+    "Healthy You will not request microphone permission, record audio, upload audio, or send a transcript automatically.",
 });

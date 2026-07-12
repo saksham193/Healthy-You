@@ -2,6 +2,7 @@ import { raw, Router } from "express";
 import { env } from "../config/env";
 import { AIChatController } from "../controllers/AIChatController";
 import { AIController } from "../controllers/AIController";
+import { AIVoiceController, VOICE_AUDIO_ALLOWED_MIME_TYPES } from "../controllers/AIVoiceController";
 import { requireAuth } from "../middleware/authMiddleware";
 import { aiRateLimit } from "../middleware/security";
 import { validateBody } from "../middleware/validateRequest";
@@ -11,6 +12,7 @@ import { aiChatRequestSchema, aiRequestSchema } from "../types/contracts";
 
 const controller = new AIController();
 const chatController = new AIChatController();
+const voiceController = new AIVoiceController();
 export const aiRoutes = Router();
 const nutritionImageParser = raw({
   limit: env.REQUEST_BODY_LIMIT_AI_IMAGE,
@@ -20,6 +22,10 @@ const attachmentParser = raw({
   limit: ATTACHMENT_TEXT_MAX_BYTES,
   type: [...ATTACHMENT_ALLOWED_MIME_TYPES],
 });
+const voiceParser = raw({
+  limit: env.STT_MAX_AUDIO_BYTES,
+  type: [...VOICE_AUDIO_ALLOWED_MIME_TYPES],
+});
 
 aiRoutes.get("/providers/status", chatController.getProviderStatus);
 aiRoutes.post("/chat", aiRateLimit, validateBody(aiChatRequestSchema), chatController.chat);
@@ -27,3 +33,4 @@ aiRoutes.post("/message", aiRateLimit, requireAuth, validateBody(aiRequestSchema
 aiRoutes.post("/nutrition/analyze-image", aiRateLimit, requireAuth, nutritionImageParser, controller.analyzeNutritionImage);
 aiRoutes.post("/attachments/analyze", aiRateLimit, requireAuth, attachmentParser, controller.analyzeAssistantAttachment);
 aiRoutes.post("/assistant/analyze-attachment", aiRateLimit, requireAuth, attachmentParser, controller.analyzeAssistantAttachment);
+aiRoutes.post("/voice/transcribe", aiRateLimit, requireAuth, voiceParser, voiceController.transcribe);
