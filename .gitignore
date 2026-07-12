@@ -47,12 +47,16 @@ Thumbs.db
 !.env.example
 backend/dist/
 backend/data/
+backend/backups/
+backups/
 backend/.env*
 !backend/.env.example
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
 *.db
+*.backup
+*.bak
 *.secret
 *.secrets
 
